@@ -1,0 +1,30 @@
+../LUFA_100807/LUFA/Drivers/USB/HighLevel/DeviceStandardReq.o: \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/DeviceStandardReq.c \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/USBMode.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/DeviceStandardReq.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/StdDescriptors.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../../../Common/Common.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../../../Common/Attributes.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../../../Common/BoardTypes.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/Events.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/../../../Common/Common.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/../HighLevel/StdDescriptors.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/USBInterrupt.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/../HighLevel/USBMode.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/../HighLevel/Events.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/USBController.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/../HighLevel/USBTask.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/../HighLevel/../LowLevel/USBController.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/../HighLevel/Events.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/../HighLevel/StdRequestType.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/../HighLevel/StdDescriptors.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/../HighLevel/USBMode.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/../HighLevel/DeviceStandardReq.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/Device.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/Endpoint.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/../HighLevel/StreamCallbacks.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/../HighLevel/DeviceStandardReq.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/StdRequestType.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/USBTask.h \
+ ../LUFA_100807/LUFA/Drivers/USB/HighLevel/../LowLevel/USBController.h
