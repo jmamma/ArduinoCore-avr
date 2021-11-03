@@ -83,28 +83,47 @@ USB_ClassInfo_CDC_Device_t VirtualSerial_CDC_Interface = {
  * including initial setup of all components and the main program loop.
  */
 
-//#include "SdFat.h"
-#define SD_CS 8
+uint32_t Boot_Key ATTR_NO_INIT;
+#define MAGIC_BOOT_KEY            0xDC42ACCA
+#define BOOTLOADER_START_ADDRESS  (FLASH_SIZE_BYTES - BOOTLOADER_SEC_SIZE_BYTES)
+void Bootloader_Jump_Check(void) ATTR_INIT_SECTION(3);
+void Bootloader_Jump_Check(void)
+{
+    // If the reset source was the bootloader and the key is correct, clear it and jump to the bootloader
+    if ((MCUSR & (1 << WDRF)) && (Boot_Key == MAGIC_BOOT_KEY))
+    {
+        Boot_Key = 0;
+        ((void (*)(void))BOOTLOADER_START_ADDRESS)();
+    }
+}
+void Jump_To_Bootloader(void)
+{
+    // If USB is used, detach from the bus and reset it
+    USB_Disable();
 
-PrintUart p;
-#define BUF_SIZE 600
-//byte buf[BUF_SIZE + 1];
+    // Disable all interrupts
+    cli();
+
+    // Wait two seconds for the USB detachment to register on the host
+    Delay_MS(2000);
+
+    // Set the bootloader key to the magic value and force a reset
+    Boot_Key = MAGIC_BOOT_KEY;
+    wdt_enable(WDTO_250MS);
+    for (;;);
+}
+
 int main(void) {
-//  memset(buf, 255, BUF_SIZE);
   SetupHardware();
 
   RingBuffer_InitBuffer(&USBtoUSART_Buffer);
   RingBuffer_InitBuffer(&USARTtoUSB_Buffer);
-  DDRC |= (1 << 7);
-  PORTC &= ~(1 << 7);
-
   sei();
 
-  bool sd_state = false;
-  uint32_t count = BUF_SIZE;
-  PulseMSRemaining.TxLEDPulse = TX_RX_LED_PULSE_MS;
-
   for (;;) {
+    /* Let's go DFU */
+//    Jump_To_Bootloader();
+//    if (PORTC & (1 << PC5)) { Jump_To_Bootloader(); }
     /* Only try to read in bytes from the CDC interface if the transmit buffer
      * is not full */
     if (!(RingBuffer_IsFull(&USBtoUSART_Buffer))) {
@@ -151,33 +170,7 @@ int main(void) {
 
     CDC_Device_USBTask(&VirtualSerial_CDC_Interface);
     USB_USBTask();
-    if (USB_DeviceState == DEVICE_STATE_Configured && count > 0) {
-      p.println("hello");
-      count--;
-      if (count == 0) { count = BUF_SIZE;}
-     p.println("SD begin...");
 
-//SdFat SD;
-//     sd_state = SD.begin();
-  //   buf[count] = count;
-    // p.println(buf[count]);
-    }
-
-    /* 
-    File myFile;
-     myFile = SD.open("atmega16.txt", FILE_WRITE);
-//     if (myFile) {
- //      for (int y = 0; y < 100; y++) {
-  //       for (int x = 0; x < 20; x++) {
-           count += myFile.write(1);
-  //       }
-  //     }
-  //   }
- // myFile.close();
-  */
-    //  }
-    //
-    //  */
   }
 }
 
@@ -196,6 +189,12 @@ void SetupHardware(void) {
   /* Start the flush timer so that overflows occur rapidly to push received
    * bytes to the USB interface */
   TCCR0B = (1 << CS02);
+
+  // Set most of PORTC lines to input
+  DDRC = 0;
+
+  // PC7 is used as output for card Select.
+  DDRC |= (1 << PC7);
 
   /* Pull target /RESET line high */
   AVR_RESET_LINE_PORT |= AVR_RESET_LINE_MASK;

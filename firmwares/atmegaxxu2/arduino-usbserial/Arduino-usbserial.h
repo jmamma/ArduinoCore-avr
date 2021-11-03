@@ -83,15 +83,4 @@ void EVENT_CDC_Device_LineEncodingChanged(
 void EVENT_CDC_Device_ControLineStateChanged(
     USB_ClassInfo_CDC_Device_t *const CDCInterfaceInfo);
 
-#include "Print.h"
-extern RingBuff_t USARTtoUSB_Buffer;
-class PrintUart : public Print {
-  public:
-    virtual size_t write(uint8_t c) {
-//     if (USB_DeviceState == DEVICE_STATE_Configured) {
-    RingBuffer_Insert(&USARTtoUSB_Buffer, c); 
-  //   }
-    }   
-};
-
 #endif /* _ARDUINO_USBSERIAL_H_ */

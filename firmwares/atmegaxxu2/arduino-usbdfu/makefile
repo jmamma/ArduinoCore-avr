@@ -48,16 +48,16 @@
 
 
 # MCU name
-MCU = atmega8u2
+MCU = atmega32u2
 MCU_AVRDUDE = at90usb82
 
 # Specify the Arduino model using the assigned PID.  This is used by Descriptors.c
 #   to set the product descriptor string (for DFU we must use the PID for each
 #   chip that dfu-bootloader or Flip expect)
 # Uno PID:
-ARDUINO_MODEL_PID = 0x0001
-# Mega 2560 PID:
 #ARDUINO_MODEL_PID = 0x0010
+# Mega 2560 PID:
+ARDUINO_MODEL_PID = 0x0010
 
 # Target board (see library "Board Types" documentation, NONE for projects not requiring
 # LUFA board drivers). If USER is selected, put custom board drivers in a directory called 
@@ -95,10 +95,11 @@ F_CLOCK = $(F_CPU)
 
 # Starting byte address of the bootloader, as a byte address - computed via the formula
 #   BOOT_START = ((TOTAL_FLASH_BYTES - BOOTLOADER_SECTION_SIZE_BYTES) * 1024)
-#
+#   32 * 1024 - 4 * 1024
 # Note that the bootloader size and start address given in AVRStudio is in words and not
 # bytes, and so will need to be doubled to obtain the byte address needed by AVR-GCC.
-BOOT_START =  0x1000
+
+BOOT_START =  0x7000
 
 
 # Output format. (can be srec, ihex, binary)
@@ -116,7 +117,7 @@ OBJDIR = .
 
 
 # Path to the LUFA library
-LUFA_PATH = ../..
+LUFA_PATH = ../LUFA_100807/
 
 
 # LUFA library compile-time options and predefined tokens
@@ -206,6 +207,7 @@ ADEFS += $(LUFA_OPTS)
 CPPDEFS  = -DF_CPU=$(F_CPU)UL
 CPPDEFS += -DF_CLOCK=$(F_CLOCK)UL
 CPPDEFS += -DBOARD=BOARD_$(BOARD)
+
 CDEFS += -DBOOT_START_ADDR=$(BOOT_START)UL
 CPPDEFS += $(LUFA_OPTS)
 #CPPDEFS += -D__STDC_LIMIT_MACROS
@@ -421,13 +423,14 @@ DEBUG_HOST = localhost
 
 # Define programs and commands.
 SHELL = sh
-CC = avr-gcc
-OBJCOPY = avr-objcopy
-OBJDUMP = avr-objdump
-SIZE = avr-size
-AR = avr-ar rcs
-NM = avr-nm
-AVRDUDE = avrdude
+AVRDIR = /Applications/Arduino.app/Contents/Java/hardware/tools/avr/bin
+CC = ${AVRDIR}/avr-gcc
+OBJCOPY = ${AVRDIR}/avr-objcopy
+OBJDUMP = ${AVRDIR}/avr-objdump
+SIZE = ${AVRDIR}/avr-size
+AR = ${AVRDIR}/avr-ar rcs
+NM = ${AVRDIR}/avr-nm
+AVRDUDE = ${AVRDIR}/avrdude
 REMOVE = rm -f
 REMOVEDIR = rm -rf
 COPY = cp
