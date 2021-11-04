@@ -37,6 +37,7 @@
 
 #include "Arduino-usbserial.h"
 #include "Arduino.h"
+#include <util/delay.h>
 
 /** Circular buffer to hold data from the host before it is sent to the device
  * via the serial port. */
@@ -85,7 +86,8 @@ USB_ClassInfo_CDC_Device_t VirtualSerial_CDC_Interface = {
 
 uint32_t Boot_Key ATTR_NO_INIT;
 #define MAGIC_BOOT_KEY            0xDC42ACCA
-#define BOOTLOADER_START_ADDRESS  (FLASH_SIZE_BYTES - BOOTLOADER_SEC_SIZE_BYTES)
+#define BOOTLOADER_START_ADDRESS  0x7000
+
 void Bootloader_Jump_Check(void) ATTR_INIT_SECTION(3);
 void Bootloader_Jump_Check(void)
 {
@@ -99,13 +101,14 @@ void Bootloader_Jump_Check(void)
 void Jump_To_Bootloader(void)
 {
     // If USB is used, detach from the bus and reset it
-    USB_Disable();
+    USB_ShutDown();
 
     // Disable all interrupts
     cli();
 
     // Wait two seconds for the USB detachment to register on the host
-    Delay_MS(2000);
+    for (uint8_t i = 0; i < 128; i++)
+        _delay_ms(16);
 
     // Set the bootloader key to the magic value and force a reset
     Boot_Key = MAGIC_BOOT_KEY;
@@ -120,10 +123,10 @@ int main(void) {
   RingBuffer_InitBuffer(&USARTtoUSB_Buffer);
   sei();
 
-  for (;;) {
+ for (;;) {
     /* Let's go DFU */
-//    Jump_To_Bootloader();
-//    if (PORTC & (1 << PC5)) { Jump_To_Bootloader(); }
+   //if (PORTC & (1 << PC2)) { Jump_To_Bootloader(); }
+
     /* Only try to read in bytes from the CDC interface if the transmit buffer
      * is not full */
     if (!(RingBuffer_IsFull(&USBtoUSART_Buffer))) {
@@ -194,7 +197,7 @@ void SetupHardware(void) {
   DDRC = 0;
 
   // PC7 is used as output for card Select.
-  DDRC |= (1 << PC7);
+  DDRC |= (1 << DDC7);
 
   /* Pull target /RESET line high */
   AVR_RESET_LINE_PORT |= AVR_RESET_LINE_MASK;
