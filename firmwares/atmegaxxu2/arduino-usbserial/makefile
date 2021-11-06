@@ -180,6 +180,7 @@ clean:
 	find . -iname '*.o' -exec rm {} \; ; \
 	find . -iname '*.os' -exec rm {} \; ; \
 	find . -iname '*.elf' -exec rm {} \; ; \
+	find . -iname '*.hex' -exec rm {} \; ; \
 	find . -iname '*.lst' -exec rm {} \; ;
 
 

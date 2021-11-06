@@ -85,35 +85,44 @@ USB_ClassInfo_CDC_Device_t VirtualSerial_CDC_Interface = {
  */
 
 uint32_t Boot_Key ATTR_NO_INIT;
-#define MAGIC_BOOT_KEY            0xDC42ACCA
-#define BOOTLOADER_START_ADDRESS  0x7000
+#define MAGIC_BOOT_KEY 0xDC42ACCA
+#define BOOTLOADER_START_ADDRESS 0x7000
 
 void Bootloader_Jump_Check(void) ATTR_INIT_SECTION(3);
-void Bootloader_Jump_Check(void)
-{
-    // If the reset source was the bootloader and the key is correct, clear it and jump to the bootloader
-    if ((MCUSR & (1 << WDRF)) && (Boot_Key == MAGIC_BOOT_KEY))
-    {
-        Boot_Key = 0;
-        ((void (*)(void))BOOTLOADER_START_ADDRESS)();
-    }
+void Bootloader_Jump_Check(void) {
+  // If the reset source was the bootloader and the key is correct, clear it and
+  // jump to the bootloader
+  if ((MCUSR & (1 << WDRF)) && (Boot_Key == MAGIC_BOOT_KEY)) {
+    Boot_Key = 0;
+    ((void (*)(void))BOOTLOADER_START_ADDRESS)();
+  }
 }
-void Jump_To_Bootloader(void)
-{
-    // If USB is used, detach from the bus and reset it
-    USB_ShutDown();
 
-    // Disable all interrupts
-    cli();
+void Jump_To_Bootloader(void) {
+  // If USB is used, detach from the bus and reset it
+  USB_ShutDown();
 
-    // Wait two seconds for the USB detachment to register on the host
-    for (uint8_t i = 0; i < 128; i++)
-        _delay_ms(16);
+  // Disable all interrupts
+  cli();
 
-    // Set the bootloader key to the magic value and force a reset
-    Boot_Key = MAGIC_BOOT_KEY;
-    wdt_enable(WDTO_250MS);
-    for (;;);
+  // Wait two seconds for the USB detachment to register on the host
+  for (uint8_t i = 0; i < 128; i++)
+    _delay_ms(16);
+
+  // Set the bootloader key to the magic value and force a reset
+  Boot_Key = MAGIC_BOOT_KEY;
+  wdt_enable(WDTO_250MS);
+  for (;;)
+    ;
+}
+
+void send_byte(char c) {
+
+  if (USB_DeviceState == DEVICE_STATE_Configured) {
+    RingBuffer_Insert(&USARTtoUSB_Buffer, c);
+    RingBuffer_Insert(&USARTtoUSB_Buffer, '\r');
+    RingBuffer_Insert(&USARTtoUSB_Buffer, '\n');
+  }
 }
 
 int main(void) {
@@ -123,30 +132,34 @@ int main(void) {
   RingBuffer_InitBuffer(&USARTtoUSB_Buffer);
   sei();
 
- for (;;) {
-    /* Let's go DFU */
-   //if (PORTC & (1 << PC2)) { Jump_To_Bootloader(); }
+  for (;;) {
+    /* Let's run DFU bootloader if PC2 is active low*/
+    if ((PINC & (1 << PC2)) == 0) {
+      Jump_To_Bootloader();
+    }
 
     /* Only try to read in bytes from the CDC interface if the transmit buffer
      * is not full */
+
     if (!(RingBuffer_IsFull(&USBtoUSART_Buffer))) {
       int16_t ReceivedByte =
           CDC_Device_ReceiveByte(&VirtualSerial_CDC_Interface);
 
-      /* Read bytes from the USB OUT endpoint into the USART transmit buffer */
+      /* Read bytes from the USB OUT endpoint into the USART transmit buffer
+       */
       if (!(ReceivedByte < 0))
         RingBuffer_Insert(&USBtoUSART_Buffer, ReceivedByte);
     }
 
-    /* Check if the UART receive buffer flush timer has expired or the buffer is
-     * nearly full */
+    /* Check if the UART receive buffer flush timer has expired or the buffer
+     * is nearly full */
     RingBuff_Count_t BufferCount = RingBuffer_GetCount(&USARTtoUSB_Buffer);
     if ((TIFR0 & (1 << TOV0)) || (BufferCount > BUFFER_NEARLY_FULL)) {
       TIFR0 |= (1 << TOV0);
 
       if (USARTtoUSB_Buffer.Count) {
-     //   LEDs_TurnOnLEDs(LEDMASK_TX);
-     //   PulseMSRemaining.TxLEDPulse = TX_RX_LED_PULSE_MS;
+        //   LEDs_TurnOnLEDs(LEDMASK_TX);
+        //   PulseMSRemaining.TxLEDPulse = TX_RX_LED_PULSE_MS;
       }
 
       /* Read bytes from the USART receive buffer into the USB IN endpoint */
@@ -155,11 +168,11 @@ int main(void) {
                             RingBuffer_Remove(&USARTtoUSB_Buffer));
 
       /* Turn off TX LED(s) once the TX pulse period has elapsed */
-    //  if (PulseMSRemaining.TxLEDPulse && !(--PulseMSRemaining.TxLEDPulse))
+      //  if (PulseMSRemaining.TxLEDPulse && !(--PulseMSRemaining.TxLEDPulse))
       //  LEDs_TurnOffLEDs(LEDMASK_TX);
 
       /* Turn off RX LED(s) once the RX pulse period has elapsed */
-     // if (PulseMSRemaining.RxLEDPulse && !(--PulseMSRemaining.RxLEDPulse))
+      // if (PulseMSRemaining.RxLEDPulse && !(--PulseMSRemaining.RxLEDPulse))
       //  LEDs_TurnOffLEDs(LEDMASK_RX);
     }
 
@@ -167,16 +180,14 @@ int main(void) {
     if (!(RingBuffer_IsEmpty(&USBtoUSART_Buffer))) {
       Serial_TxByte(RingBuffer_Remove(&USBtoUSART_Buffer));
 
-     // LEDs_TurnOnLEDs(LEDMASK_RX);
-    //  PulseMSRemaining.RxLEDPulse = TX_RX_LED_PULSE_MS;
+      // LEDs_TurnOnLEDs(LEDMASK_RX);
+      //  PulseMSRemaining.RxLEDPulse = TX_RX_LED_PULSE_MS;
     }
 
     CDC_Device_USBTask(&VirtualSerial_CDC_Interface);
     USB_USBTask();
-
   }
 }
-
 /** Configures the board hardware and chip peripherals for the demo's
  * functionality. */
 void SetupHardware(void) {
@@ -193,11 +204,12 @@ void SetupHardware(void) {
    * bytes to the USB interface */
   TCCR0B = (1 << CS02);
 
-  // Set most of PORTC lines to input
+  /* Set PORTC input */
   DDRC = 0;
-
-  // PC7 is used as output for card Select.
-  DDRC |= (1 << DDC7);
+  // PC7 is output, used for SD Card select.
+  DDRC |= (1 << PC7);
+  // PC2, PC4, PC5 are input and should be active low. Therefor enable pullup.
+  PORTC = (1 << PC2) | (1 << PC4) | (1 << PC5);
 
   /* Pull target /RESET line high */
   AVR_RESET_LINE_PORT |= AVR_RESET_LINE_MASK;
@@ -273,7 +285,6 @@ void EVENT_CDC_Device_LineEncodingChanged(
  */
 ISR(USART1_RX_vect, ISR_BLOCK) {
   uint8_t ReceivedByte = UDR1;
-
   if (USB_DeviceState == DEVICE_STATE_Configured)
     RingBuffer_Insert(&USARTtoUSB_Buffer, ReceivedByte);
 }

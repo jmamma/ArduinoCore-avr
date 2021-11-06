@@ -55,6 +55,8 @@
 #include <LUFA/Drivers/USB/USB.h>
 #include <LUFA/Drivers/USB/Class/CDC.h>
 
+#include <LUFA/Common/Common.h>
+
 /* Macros: */
 /** LED mask for the library LED driver, to indicate TX activity. */
 #define LEDMASK_TX LEDS_LED1
