@@ -126,7 +126,7 @@
 			 *
 			 *  \param[in] SectionIndex  Initialization section number where the function should be placed.
 			 */
-			#define ATTR_INIT_SECTION(SectionIndex) __attribute__ ((naked, section (".init" #SectionIndex )))
+			#define ATTR_INIT_SECTION(SectionIndex) __attribute__ ((naked, used, section (".init" #SectionIndex )))
 			
 			/** Marks a function as an alias for another function.
 			 *
