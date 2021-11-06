@@ -52,10 +52,11 @@ USB_Descriptor_Device_t DeviceDescriptor =
 	.Protocol               = 0x00,
 				
 	.Endpoint0Size          = FIXED_CONTROL_ENDPOINT_SIZE,
-		
-	.VendorID               = 0x03EB, // Atmel
-	.ProductID              = PRODUCT_ID_CODE, // MCU-dependent
-	.ReleaseNumber          = 0x0000,
+
+    .VendorID               = 0x1209, // pid.codes
+    .ProductID              = 0x1100, // MegaCMD - MegaCommand		
+
+    .ReleaseNumber          = 0x0000,
 		
 	.ManufacturerStrIndex   = NO_DESCRIPTOR,
 	.ProductStrIndex        = 0x01,
