@@ -140,7 +140,11 @@ USB_Descriptor_String_t ProductString =
 		.Header                 = {.Size = USB_STRING_LEN(21), .Type = DTYPE_String},
 			
 		.UnicodeString          = L"Arduino Mega 2560 DFU"
-	#endif
+	#elif (ARDUINO_MODEL_PID == MEGACMD_PID)
+		.Header                 = {.Size = USB_STRING_LEN(11), .Type = DTYPE_String},
+			
+		.UnicodeString          = L"MegaCMD DFU"
+    #endif
 };
 
 /** This function is called by the library when in device mode, and must be overridden (see library "USB Descriptors"

@@ -57,7 +57,7 @@ MCU_AVRDUDE = at90usb82
 # Uno PID:
 #ARDUINO_MODEL_PID = 0x0010
 # Mega 2560 PID:
-ARDUINO_MODEL_PID = 0x0010
+ARDUINO_MODEL_PID = 0x0100 #MegaCMD
 
 # Target board (see library "Board Types" documentation, NONE for projects not requiring
 # LUFA board drivers). If USER is selected, put custom board drivers in a directory called 

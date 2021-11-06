@@ -42,7 +42,7 @@
 	/* Product-specific definitions: */
 		#define ARDUINO_UNO_PID				0x0001
 		#define ARDUINO_MEGA2560_PID		0x0010		
-
+        #define MEGACMD_PID                 0x0100
 	/* Macros: */
 		/** Descriptor type value for a DFU class functional descriptor. */
 		#define DTYPE_DFUFunctional               0x21

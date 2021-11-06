@@ -222,8 +222,11 @@ const USB_Descriptor_String_t PROGMEM ProductString =
 		.Header                 = {.Size = USB_STRING_LEN(17), .Type = DTYPE_String},
 			
 		.UnicodeString          = L"Arduino Mega 2560"
-	#endif
-	
+	#elif (ARDUINO_MODEL_PID == MEGACMD_PID)
+		.Header                 = {.Size = USB_STRING_LEN(7), .Type = DTYPE_String},
+			
+		.UnicodeString          = L"MegaCMD"
+    #endif
 };
 
 /** This function is called by the library when in device mode, and must be overridden (see library "USB Descriptors"
