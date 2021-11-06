@@ -1,1 +1,2 @@
-..\..\..\tools\avr\utils\bin\make OS=windows ENV=arduino %*
+call .\install-avr-tools.bat
+make %*
