@@ -67,7 +67,7 @@ const USB_Descriptor_Device_t PROGMEM DeviceDescriptor =
 		
 	.VendorID               = 0x1209, // pid.codes
 
-	.ProductID          	= 0x1100, // MegaCMD - MegaCommand
+	.ProductID          	= 0x3070, // MegaCMD - MegaCommand
 	.ReleaseNumber          = 0x0001,
 		
 	.ManufacturerStrIndex   = 0x01,

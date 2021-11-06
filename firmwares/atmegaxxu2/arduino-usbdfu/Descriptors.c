@@ -54,7 +54,7 @@ USB_Descriptor_Device_t DeviceDescriptor =
 	.Endpoint0Size          = FIXED_CONTROL_ENDPOINT_SIZE,
 
     .VendorID               = 0x1209, // pid.codes
-    .ProductID              = 0x1100, // MegaCMD - MegaCommand		
+    .ProductID              = 0x3070, // MegaCMD - MegaCommand		
 
     .ReleaseNumber          = 0x0000,
 		
