@@ -62,7 +62,10 @@
         /** Size in bytes of the CDC data IN and OUT endpoints. */
         #define CDC_TXRX_EPSIZE                64
 
-     /* Type Defines: */
+        #define USB_SERIAL 0x00
+        #define USB_MIDI   0x01
+
+        /* Type Defines: */
         /** Type define for the device configuration descriptor structure. This must be defined in the
          *  application code, as the configuration descriptor contains several sub-descriptors which
          *  vary between devices, and which describe the device's usage to the host.
@@ -88,6 +91,9 @@
         {   
             INTERFACE_ID_CDC_CCI = 0, /**< CDC CCI interface descriptor ID */
             INTERFACE_ID_CDC_DCI = 1, /**< CDC DCI interface descriptor ID */
+            INTERFACE_ID_AudioControl = 0, /**< Audio control interface descriptor ID */
+            INTERFACE_ID_AudioStream  = 1, /**< Audio stream interface descriptor ID */
+ 
         };  
 
         /** Enum for the device string descriptor IDs within the device. Each string descriptor should
@@ -101,6 +107,47 @@
             STRING_ID_Product      = 2, /**< Product string ID */
         };  
 
+
+
+        /** Endpoint address of the MIDI streaming data IN endpoint, for device-to-host data transfers. */
+        #define MIDI_STREAM_IN_EPADDR       (ENDPOINT_DIR_IN  | 2)
+
+        /** Endpoint address of the MIDI streaming data OUT endpoint, for host-to-device data transfers. */
+        #define MIDI_STREAM_OUT_EPADDR      (ENDPOINT_DIR_OUT | 1)
+
+        /** Endpoint size in bytes of the Audio isochronous streaming data IN and OUT endpoints. */
+        #define MIDI_STREAM_EPSIZE          64
+
+    /* Type Defines: */
+        /** Type define for the device configuration descriptor structure. This must be defined in the
+         *  application code, as the configuration descriptor contains several sub-descriptors which
+         *  vary between devices, and which describe the device's usage to the host.
+         */
+        typedef struct
+        {   
+            USB_Descriptor_Configuration_Header_t     Config;
+
+            // MIDI Audio Control Interface
+            USB_Descriptor_Interface_t                Audio_ControlInterface;
+            USB_Audio_Descriptor_Interface_AC_t       Audio_ControlInterface_SPC;
+
+            // MIDI Audio Streaming Interface
+            USB_Descriptor_Interface_t                Audio_StreamInterface;
+            USB_MIDI_Descriptor_AudioInterface_AS_t   Audio_StreamInterface_SPC;
+            USB_MIDI_Descriptor_InputJack_t           MIDI_In_Jack_Emb;
+            USB_MIDI_Descriptor_InputJack_t           MIDI_In_Jack_Ext;
+            USB_MIDI_Descriptor_OutputJack_t          MIDI_Out_Jack_Emb;
+            USB_MIDI_Descriptor_OutputJack_t          MIDI_Out_Jack_Ext;
+            USB_Audio_Descriptor_StreamEndpoint_Std_t MIDI_In_Jack_Endpoint;
+            USB_MIDI_Descriptor_Jack_Endpoint_t       MIDI_In_Jack_Endpoint_SPC;
+            USB_Audio_Descriptor_StreamEndpoint_Std_t MIDI_Out_Jack_Endpoint;
+            USB_MIDI_Descriptor_Jack_Endpoint_t       MIDI_Out_Jack_Endpoint_SPC;
+        } USB_MIDI_Descriptor_Configuration_t;
+
+        /** Enum for the device interface descriptor IDs within the device. Each interface descriptor
+         *  should have a unique ID index associated with it, which can be used to refer to the
+         *  interface from other descriptors.
+         */
 
             /* Function Prototypes: */
         uint16_t CALLBACK_USB_GetDescriptor(const uint16_t wValue,

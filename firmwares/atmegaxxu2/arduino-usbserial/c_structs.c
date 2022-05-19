@@ -13,6 +13,26 @@
  * another. 
  */
 
+USB_ClassInfo_MIDI_Device_t USB_MIDI_Interface =
+    {   
+        .Config =
+            {   
+                .StreamingInterfaceNumber = INTERFACE_ID_AudioStream,
+                .DataINEndpoint           =   
+                    {   
+                        .Address          = MIDI_STREAM_IN_EPADDR,
+                        .Size             = MIDI_STREAM_EPSIZE,
+                        .Banks            = 1,
+                    },  
+                .DataOUTEndpoint           =   
+                    {   
+                        .Address          = MIDI_STREAM_OUT_EPADDR,
+                        .Size             = MIDI_STREAM_EPSIZE,
+                        .Banks            = 1,
+                    },  
+            },  
+    }; 
+
 USB_ClassInfo_CDC_Device_t VirtualSerial_CDC_Interface = { 
     .Config = 
         { 

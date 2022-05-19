@@ -89,63 +89,100 @@ void send_byte(char c) {
 }
 
 int main(void) {
-  SetupHardware();
+  usb_mode = USB_MIDI;
 
+  SetupHardware();
+  
   RingBuffer_InitBuffer(&USBtoUSART_Buffer);
   RingBuffer_InitBuffer(&USARTtoUSB_Buffer);
   sei();
 
   for (;;) {
     /* Let's run DFU bootloader if PC2 is active low*/
-     if ((PINC & (1 << PC2)) == 0) {
-        Jump_To_Bootloader();
-     }
-
-    /* Only try to read in bytes from the CDC interface if the transmit buffer
-     * is not full */
-
-    if (!(RingBuffer_IsFull(&USBtoUSART_Buffer))) {
-      int16_t ReceivedByte =
-          CDC_Device_ReceiveByte(&VirtualSerial_CDC_Interface);
-
-      /* Read bytes from the USB OUT endpoint into the USART transmit buffer
-       */
-      if (!(ReceivedByte < 0))
-        RingBuffer_Insert(&USBtoUSART_Buffer, ReceivedByte);
+    if ((PINC & (1 << PC2)) == 0) {
+      Jump_To_Bootloader();
     }
-   //   if (USB_DeviceState == DEVICE_STATE_Configured) {
-   //  CDC_Device_SendByte(&VirtualSerial_CDC_Interface,0xFF);
 
-  // }
-
-    /* Check if the UART receive buffer flush timer has expired or the buffer
-     * is nearly full */
-    RingBuff_Count_t BufferCount = RingBuffer_GetCount(&USARTtoUSB_Buffer);
-    if ((TIFR0 & (1 << TOV0)) || (BufferCount > BUFFER_NEARLY_FULL)) {
-      TIFR0 |= (1 << TOV0);
-
-      if (USARTtoUSB_Buffer.Count) {
-        //   LEDs_TurnOnLEDs(LEDMASK_TX);
-        //   PulseMSRemaining.TxLEDPulse = TX_RX_LED_PULSE_MS;
+    if (USB_DeviceState == DEVICE_STATE_Configured) {
+      switch (usb_mode) {
+      case USB_SERIAL:
+        USB_Serial();
+        break;
+      case USB_MIDI:
+        USB_Midi();
+        break;
       }
-
-      /* Read bytes from the USART receive buffer into the USB IN endpoint */
-      while (BufferCount--)
-        CDC_Device_SendByte(&VirtualSerial_CDC_Interface,
-                            RingBuffer_Remove(&USARTtoUSB_Buffer));
-
     }
-
-    /* Load the next byte from the USART transmit buffer into the USART */
-    if (!(RingBuffer_IsEmpty(&USBtoUSART_Buffer))) {
-      Serial_SendByte(RingBuffer_Remove(&USBtoUSART_Buffer));
-
-   }
-
-    CDC_Device_USBTask(&VirtualSerial_CDC_Interface);
     USB_USBTask();
   }
 }
+
+void USB_Serial() {
+
+  /* Only try to read in bytes from the CDC interface if the transmit buffer
+   * is not full */
+
+  if (!(RingBuffer_IsFull(&USBtoUSART_Buffer))) {
+    int16_t ReceivedByte = CDC_Device_ReceiveByte(&VirtualSerial_CDC_Interface);
+
+    /* Read bytes from the USB OUT endpoint into the USART transmit buffer
+     */
+    if (!(ReceivedByte < 0))
+      RingBuffer_Insert(&USBtoUSART_Buffer, ReceivedByte);
+  }
+  //   if (USB_DeviceState == DEVICE_STATE_Configured) {
+  //  CDC_Device_SendByte(&VirtualSerial_CDC_Interface,0xFF);
+
+  // }
+
+  /* Check if the UART receive buffer flush timer has expired or the buffer
+   * is nearly full */
+  RingBuff_Count_t BufferCount = RingBuffer_GetCount(&USARTtoUSB_Buffer);
+  if ((TIFR0 & (1 << TOV0)) || (BufferCount > BUFFER_NEARLY_FULL)) {
+    TIFR0 |= (1 << TOV0);
+
+    if (USARTtoUSB_Buffer.Count) {
+      //   LEDs_TurnOnLEDs(LEDMASK_TX);
+      //   PulseMSRemaining.TxLEDPulse = TX_RX_LED_PULSE_MS;
+    }
+
+    /* Read bytes from the USART receive buffer into the USB IN endpoint */
+    while (BufferCount--)
+      CDC_Device_SendByte(&VirtualSerial_CDC_Interface,
+                          RingBuffer_Remove(&USARTtoUSB_Buffer));
+  }
+
+  /* Load the next byte from the USART transmit buffer into the USART */
+  if (!(RingBuffer_IsEmpty(&USBtoUSART_Buffer))) {
+    Serial_SendByte(RingBuffer_Remove(&USBtoUSART_Buffer));
+  }
+
+  CDC_Device_USBTask(&VirtualSerial_CDC_Interface);
+}
+
+void USB_Midi() {
+    Endpoint_SelectEndpoint(MIDI_STREAM_IN_EPADDR);
+
+    if (Endpoint_IsINReady()) {
+       if (!(RingBuffer_IsEmpty(&USBtoUSART_Buffer))) {
+       Endpoint_Write_8(RingBuffer_Remove(&USBtoUSART_Buffer));
+    //   Endpoint_ClearIN();
+       }
+    }
+        /* Select the MIDI OUT stream */
+    Endpoint_SelectEndpoint(MIDI_STREAM_OUT_EPADDR);
+
+    /* Check if a MIDI command has been received */
+    if (Endpoint_IsOUTReceived()) {
+    //Endpoint_Read_Stream_LE(c, 1, NULL);
+      uint8_t c = Endpoint_Read_8();
+      RingBuffer_Insert(&USBtoUSART_Buffer, c);
+    }
+    /* General management task for a given MIDI class interface, required for the correct operation of the interface.
+     * This should be called frequently in the main program loop, before the master USB management task USB_USBTask(). */
+    MIDI_Device_USBTask(&USB_MIDI_Interface);
+}
+
 /** Configures the board hardware and chip peripherals for the demo's
  * functionality. */
 void SetupHardware(void) {
@@ -174,21 +211,26 @@ void SetupHardware(void) {
 }
 
 /** Event handler for the library USB Configuration Changed event. */
-void EVENT_USB_Device_ConfigurationChanged(void)
-{
-    bool ConfigSuccess = true;
+void EVENT_USB_Device_ConfigurationChanged(void) {
+  bool ConfigSuccess = true;
 
-    ConfigSuccess &= CDC_Device_ConfigureEndpoints(&VirtualSerial_CDC_Interface);
-
+  switch (usb_mode) {
+  case USB_SERIAL:
+    ConfigSuccess &=
+        CDC_Device_ConfigureEndpoints(&VirtualSerial_CDC_Interface);
+    break;
+  case USB_MIDI:
+    //ConfigSuccess &= Endpoint_ConfigureEndpoint(MIDI_STREAM_IN_EPADDR, EP_TYPE_BULK, MIDI_STREAM_EPSIZE, 1); 
+    //ConfigSuccess &= Endpoint_ConfigureEndpoint(MIDI_STREAM_OUT_EPADDR, EP_TYPE_BULK, MIDI_STREAM_EPSIZE, 1); 
+    ConfigSuccess &= MIDI_Device_ConfigureEndpoints(&USB_MIDI_Interface);
+    break;
+  }
 }
 
 /** Event handler for the library USB Control Request reception event. */
-void EVENT_USB_Device_ControlRequest(void)
-{
-    CDC_Device_ProcessControlRequest(&VirtualSerial_CDC_Interface);
+void EVENT_USB_Device_ControlRequest(void) {
+  CDC_Device_ProcessControlRequest(&VirtualSerial_CDC_Interface);
 }
-
-
 
 /** Event handler for the CDC Class driver Line Encoding Changed event.
  *

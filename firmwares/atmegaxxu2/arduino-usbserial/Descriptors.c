@@ -37,6 +37,8 @@
 
 #include "Descriptors.h"
 
+uint8_t usb_mode = USB_MIDI;
+
 /* On some devices, there is a factory set internal serial number which can be automatically sent to the host as
  * the device's serial number when the Device Descriptor's .SerialNumStrIndex entry is set to USE_INTERNAL_SERIAL.
  * This allows the host to track a device across insertions on different ports, allowing them to retain allocated
@@ -79,7 +81,7 @@ const USB_Descriptor_Device_t PROGMEM DeviceDescriptor =
  *  and endpoints. The descriptor is read out by the USB host during the enumeration process when selecting
  *  a configuration so that the host may correctly communicate with the USB device.
  */
-const USB_Descriptor_Configuration_t PROGMEM ConfigurationDescriptor =
+const USB_Descriptor_Configuration_t PROGMEM USB_ConfigurationDescriptor =
 {
 	.Config =
 		{
@@ -190,7 +192,6 @@ const USB_Descriptor_Configuration_t PROGMEM ConfigurationDescriptor =
 const USB_Descriptor_String_t PROGMEM LanguageString =
 {
 	.Header                 = {.Size = USB_STRING_LEN(1), .Type = DTYPE_String},
-		
 	.UnicodeString          = {LANGUAGE_ID_ENG}
 };
 
@@ -201,7 +202,6 @@ const USB_Descriptor_String_t PROGMEM LanguageString =
 const USB_Descriptor_String_t PROGMEM ManufacturerString =
 {
 	.Header                 = {.Size = USB_STRING_LEN(25), .Type = DTYPE_String},
-		
 	.UnicodeString          = L"MegaCMD (www.megacmd.com)"
 };
 
@@ -213,18 +213,191 @@ const USB_Descriptor_String_t PROGMEM ProductString =
 {
 	#if (ARDUINO_MODEL_PID == ARDUINO_UNO_PID)
 		.Header                 = {.Size = USB_STRING_LEN(11), .Type = DTYPE_String},
-			
 		.UnicodeString          = L"Arduino Uno"
 	#elif (ARDUINO_MODEL_PID == ARDUINO_MEGA2560_PID)
 		.Header                 = {.Size = USB_STRING_LEN(17), .Type = DTYPE_String},
-			
 		.UnicodeString          = L"Arduino Mega 2560"
 	#elif (ARDUINO_MODEL_PID == MEGACMD_PID)
 		.Header                 = {.Size = USB_STRING_LEN(7), .Type = DTYPE_String},
-			
 		.UnicodeString          = L"MegaCMD"
     #endif
 };
+
+const USB_MIDI_Descriptor_Configuration_t PROGMEM USB_MIDI_ConfigurationDescriptor =
+{
+	.Config =
+		{
+			.Header                   = {.Size = sizeof(USB_Descriptor_Configuration_Header_t), .Type = DTYPE_Configuration},
+
+			.TotalConfigurationSize   = sizeof(USB_MIDI_Descriptor_Configuration_t),
+			.TotalInterfaces          = 2,
+
+			.ConfigurationNumber      = 1,
+			.ConfigurationStrIndex    = NO_DESCRIPTOR,
+
+			.ConfigAttributes         = (USB_CONFIG_ATTR_RESERVED | USB_CONFIG_ATTR_SELFPOWERED),
+
+			.MaxPowerConsumption      = USB_CONFIG_POWER_MA(100)
+		},
+
+	.Audio_ControlInterface =
+		{
+			.Header                   = {.Size = sizeof(USB_Descriptor_Interface_t), .Type = DTYPE_Interface},
+
+			.InterfaceNumber          = INTERFACE_ID_AudioControl,
+			.AlternateSetting         = 0,
+
+			.TotalEndpoints           = 0,
+
+			.Class                    = AUDIO_CSCP_AudioClass,
+			.SubClass                 = AUDIO_CSCP_ControlSubclass,
+			.Protocol                 = AUDIO_CSCP_ControlProtocol,
+
+			.InterfaceStrIndex        = NO_DESCRIPTOR
+		},
+
+	.Audio_ControlInterface_SPC =
+		{
+			.Header                   = {.Size = sizeof(USB_Audio_Descriptor_Interface_AC_t), .Type = AUDIO_DTYPE_CSInterface},
+			.Subtype                  = AUDIO_DSUBTYPE_CSInterface_Header,
+
+			.ACSpecification          = VERSION_BCD(1,0,0),
+			.TotalLength              = sizeof(USB_Audio_Descriptor_Interface_AC_t),
+
+			.InCollection             = 1,
+			.InterfaceNumber          = INTERFACE_ID_AudioStream,
+		},
+
+	.Audio_StreamInterface =
+		{
+			.Header                   = {.Size = sizeof(USB_Descriptor_Interface_t), .Type = DTYPE_Interface},
+
+			.InterfaceNumber          = INTERFACE_ID_AudioStream,
+			.AlternateSetting         = 0,
+
+			.TotalEndpoints           = 2,
+
+			.Class                    = AUDIO_CSCP_AudioClass,
+			.SubClass                 = AUDIO_CSCP_MIDIStreamingSubclass,
+			.Protocol                 = AUDIO_CSCP_StreamingProtocol,
+
+			.InterfaceStrIndex        = NO_DESCRIPTOR
+		},
+
+	.Audio_StreamInterface_SPC =
+		{
+			.Header                   = {.Size = sizeof(USB_MIDI_Descriptor_AudioInterface_AS_t), .Type = AUDIO_DTYPE_CSInterface},
+			.Subtype                  = AUDIO_DSUBTYPE_CSInterface_General,
+
+			.AudioSpecification       = VERSION_BCD(1,0,0),
+
+			.TotalLength              = (sizeof(USB_MIDI_Descriptor_Configuration_t) -
+			                             offsetof(USB_MIDI_Descriptor_Configuration_t, Audio_StreamInterface_SPC))
+		},
+
+	.MIDI_In_Jack_Emb =
+		{
+			.Header                   = {.Size = sizeof(USB_MIDI_Descriptor_InputJack_t), .Type = AUDIO_DTYPE_CSInterface},
+			.Subtype                  = AUDIO_DSUBTYPE_CSInterface_InputTerminal,
+
+			.JackType                 = MIDI_JACKTYPE_Embedded,
+			.JackID                   = 0x01,
+
+			.JackStrIndex             = NO_DESCRIPTOR
+		},
+
+	.MIDI_In_Jack_Ext =
+		{
+			.Header                   = {.Size = sizeof(USB_MIDI_Descriptor_InputJack_t), .Type = AUDIO_DTYPE_CSInterface},
+			.Subtype                  = AUDIO_DSUBTYPE_CSInterface_InputTerminal,
+
+			.JackType                 = MIDI_JACKTYPE_External,
+			.JackID                   = 0x02,
+
+			.JackStrIndex             = NO_DESCRIPTOR
+		},
+
+	.MIDI_Out_Jack_Emb =
+		{
+			.Header                   = {.Size = sizeof(USB_MIDI_Descriptor_OutputJack_t), .Type = AUDIO_DTYPE_CSInterface},
+			.Subtype                  = AUDIO_DSUBTYPE_CSInterface_OutputTerminal,
+
+			.JackType                 = MIDI_JACKTYPE_Embedded,
+			.JackID                   = 0x03,
+
+			.NumberOfPins             = 1,
+			.SourceJackID             = {0x02},
+			.SourcePinID              = {0x01},
+
+			.JackStrIndex             = NO_DESCRIPTOR
+		},
+
+	.MIDI_Out_Jack_Ext =
+		{
+			.Header                   = {.Size = sizeof(USB_MIDI_Descriptor_OutputJack_t), .Type = AUDIO_DTYPE_CSInterface},
+			.Subtype                  = AUDIO_DSUBTYPE_CSInterface_OutputTerminal,
+
+			.JackType                 = MIDI_JACKTYPE_External,
+			.JackID                   = 0x04,
+
+			.NumberOfPins             = 1,
+			.SourceJackID             = {0x01},
+			.SourcePinID              = {0x01},
+
+			.JackStrIndex             = NO_DESCRIPTOR
+		},
+
+	.MIDI_In_Jack_Endpoint =
+		{
+			.Endpoint =
+				{
+					.Header              = {.Size = sizeof(USB_Audio_Descriptor_StreamEndpoint_Std_t), .Type = DTYPE_Endpoint},
+
+					.EndpointAddress     = MIDI_STREAM_OUT_EPADDR,
+					.Attributes          = (EP_TYPE_BULK | ENDPOINT_ATTR_NO_SYNC | ENDPOINT_USAGE_DATA),
+					.EndpointSize        = MIDI_STREAM_EPSIZE,
+					.PollingIntervalMS   = 0x05
+				},
+
+			.Refresh                  = 0,
+			.SyncEndpointNumber       = 0
+		},
+
+	.MIDI_In_Jack_Endpoint_SPC =
+		{
+			.Header                   = {.Size = sizeof(USB_MIDI_Descriptor_Jack_Endpoint_t), .Type = AUDIO_DTYPE_CSEndpoint},
+			.Subtype                  = AUDIO_DSUBTYPE_CSEndpoint_General,
+
+			.TotalEmbeddedJacks       = 0x01,
+			.AssociatedJackID         = {0x01}
+		},
+
+	.MIDI_Out_Jack_Endpoint =
+		{
+			.Endpoint =
+				{
+					.Header              = {.Size = sizeof(USB_Audio_Descriptor_StreamEndpoint_Std_t), .Type = DTYPE_Endpoint},
+
+					.EndpointAddress     = MIDI_STREAM_IN_EPADDR,
+					.Attributes          = (EP_TYPE_BULK | ENDPOINT_ATTR_NO_SYNC | ENDPOINT_USAGE_DATA),
+					.EndpointSize        = MIDI_STREAM_EPSIZE,
+					.PollingIntervalMS   = 0x05
+				},
+
+			.Refresh                  = 0,
+			.SyncEndpointNumber       = 0
+		},
+
+	.MIDI_Out_Jack_Endpoint_SPC =
+		{
+			.Header                   = {.Size = sizeof(USB_MIDI_Descriptor_Jack_Endpoint_t), .Type = AUDIO_DTYPE_CSEndpoint},
+			.Subtype                  = AUDIO_DSUBTYPE_CSEndpoint_General,
+
+			.TotalEmbeddedJacks       = 0x01,
+			.AssociatedJackID         = {0x03}
+		}
+};
+
 
 /** This function is called by the library when in device mode, and must be overridden (see library "USB Descriptors"
  *  documentation) by the application code so that the address and size of a requested descriptor can be given
@@ -249,9 +422,17 @@ uint16_t CALLBACK_USB_GetDescriptor(const uint16_t wValue,
 			Size    = sizeof(USB_Descriptor_Device_t);
 			break;
 		case DTYPE_Configuration:
-			Address = &ConfigurationDescriptor;
-			Size    = sizeof(USB_Descriptor_Configuration_t);
-			break;
+            switch (usb_mode) {
+              case USB_SERIAL:
+              Address = &USB_ConfigurationDescriptor;
+			  Size    = sizeof(USB_Descriptor_Configuration_t);
+              break;
+              case USB_MIDI:
+              Address = &USB_MIDI_ConfigurationDescriptor;
+			  Size    = sizeof(USB_MIDI_Descriptor_Configuration_t);
+              break;
+            }
+            break;
 		case DTYPE_String:
 			switch (DescriptorNumber)
 			{
