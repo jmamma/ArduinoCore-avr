@@ -47,19 +47,6 @@ RingBuff_t USBtoUSART_Buffer;
  * host. */
 RingBuff_t USARTtoUSB_Buffer;
 
-/** Pulse generation counters to keep track of the number of milliseconds
- * remaining for each pulse type */
-volatile struct {
-  uint8_t TxLEDPulse;       /**< Milliseconds remaining for data Tx LED pulse */
-  uint8_t RxLEDPulse;       /**< Milliseconds remaining for data Rx LED pulse */
-  uint8_t PingPongLEDPulse; /**< Milliseconds remaining for enumeration Tx/Rx
-                               ping-pong LED pulse */
-} PulseMSRemaining;
-
-/** Main program entry point. This routine contains the overall program flow,
- * including initial setup of all components and the main program loop.
- */
-
 uint32_t Boot_Key ATTR_NO_INIT;
 #define MAGIC_BOOT_KEY 0xDC42ACCA
 #define BOOTLOADER_START_ADDRESS 0x7000
@@ -110,9 +97,9 @@ int main(void) {
 
   for (;;) {
     /* Let's run DFU bootloader if PC2 is active low*/
-    if ((PINC & (1 << PC2)) == 0) {
-      Jump_To_Bootloader();
-    }
+     if ((PINC & (1 << PC2)) == 0) {
+        Jump_To_Bootloader();
+     }
 
     /* Only try to read in bytes from the CDC interface if the transmit buffer
      * is not full */
@@ -126,6 +113,10 @@ int main(void) {
       if (!(ReceivedByte < 0))
         RingBuffer_Insert(&USBtoUSART_Buffer, ReceivedByte);
     }
+   //   if (USB_DeviceState == DEVICE_STATE_Configured) {
+   //  CDC_Device_SendByte(&VirtualSerial_CDC_Interface,0xFF);
+
+  // }
 
     /* Check if the UART receive buffer flush timer has expired or the buffer
      * is nearly full */
@@ -143,22 +134,13 @@ int main(void) {
         CDC_Device_SendByte(&VirtualSerial_CDC_Interface,
                             RingBuffer_Remove(&USARTtoUSB_Buffer));
 
-      /* Turn off TX LED(s) once the TX pulse period has elapsed */
-      //  if (PulseMSRemaining.TxLEDPulse && !(--PulseMSRemaining.TxLEDPulse))
-      //  LEDs_TurnOffLEDs(LEDMASK_TX);
-
-      /* Turn off RX LED(s) once the RX pulse period has elapsed */
-      // if (PulseMSRemaining.RxLEDPulse && !(--PulseMSRemaining.RxLEDPulse))
-      //  LEDs_TurnOffLEDs(LEDMASK_RX);
     }
 
     /* Load the next byte from the USART transmit buffer into the USART */
     if (!(RingBuffer_IsEmpty(&USBtoUSART_Buffer))) {
       Serial_SendByte(RingBuffer_Remove(&USBtoUSART_Buffer));
 
-      // LEDs_TurnOnLEDs(LEDMASK_RX);
-      //  PulseMSRemaining.RxLEDPulse = TX_RX_LED_PULSE_MS;
-    }
+   }
 
     CDC_Device_USBTask(&VirtualSerial_CDC_Interface);
     USB_USBTask();
@@ -192,14 +174,21 @@ void SetupHardware(void) {
 }
 
 /** Event handler for the library USB Configuration Changed event. */
-void EVENT_USB_Device_ConfigurationChanged(void) {
-  CDC_Device_ConfigureEndpoints(&VirtualSerial_CDC_Interface);
+void EVENT_USB_Device_ConfigurationChanged(void)
+{
+    bool ConfigSuccess = true;
+
+    ConfigSuccess &= CDC_Device_ConfigureEndpoints(&VirtualSerial_CDC_Interface);
+
 }
 
-/** Event handler for the library USB Unhandled Control Request event. */
-void EVENT_USB_Device_UnhandledControlRequest(void) {
-  CDC_Device_ProcessControlRequest(&VirtualSerial_CDC_Interface);
+/** Event handler for the library USB Control Request reception event. */
+void EVENT_USB_Device_ControlRequest(void)
+{
+    CDC_Device_ProcessControlRequest(&VirtualSerial_CDC_Interface);
 }
+
+
 
 /** Event handler for the CDC Class driver Line Encoding Changed event.
  *
