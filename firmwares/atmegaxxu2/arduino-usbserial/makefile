@@ -2,7 +2,7 @@ PDEDIR ?= .
 
 ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 
-ARDUINO_MODEL_PID = 0x0001
+ARDUINO_MODEL_PID = 0x0100 #MegaCMD
 BOARD = USER
 
 TARGET = Arduino-usbserial
@@ -11,6 +11,7 @@ FORMAT = ihex
 
 BASE_DIR= /Applications/Arduino.app/Contents/Java/hardware
 CORE_DIR=$(shell pwd)
+HOME_DIR=$(shell cd ..; pwd)
 VARIENTS_DIR=$(shell cd ../../; pwd)/variants/mega
 
 AR=$(shell which avr-gcc-ar)
@@ -30,30 +31,37 @@ OBJCOPY =${BASE_DIR}/tools/avr/bin/avr-objcopy
 AVRSIZE=${BASE_DIR}/tools/avr/bin/avr-size
 AVRDUDE=${BASE_DIR}/tools/avr/bin/avrdude
 AVRDUDE_CFG=${BASE_DIR}/tools/avr/etc/avrdude.conf
+COMPILER_PATH=${BASE_DIR}/tools/avr/bin/
 endif
 
 AVR_DEVICE=$(shell ls /dev/tty* | grep -i usb | head -n 1)
 UISP=uisp
 AVR_ARCH = atmega32u2
+ARCH = AVR8
+MCU = atmega32u2
 F_CPU = 16000000L
-F_CLOCK = $(F_CPU)
+F_USB = $(F_CPU)
 
 INOFILES=$(wildcard *.pde)
+
+# Path to the LUFA library
+LUFA_PATH = /Users/jmamma/dev/ArduinoCore-avr/firmwares/atmegaxxu2/LUFA_210130/LUFA
+#LUFA_ROOT_PATH = /Users/jmamma/dev/ArduinoCore-avr/firmwares/atmegaxxu2/LUFA_210130/LUFA
 
 OPTIM_FLAGS   = -Os
 WARN_FLAGS    = -Wall -Wextra
 COMPILE_FLAGS = -c $(OPTIM_FLAGS) $(WARN_FLAGS) -MMD
 FEATURE_FLAGS = -ffunction-sections -fdata-sections -flto=jobserver
 LINK_FLAGS    = -lm -Wl,--gc-sections,--relax
-ARCH_FLAGS    = -mmcu=atmega32u2 -DF_CPU=16000000L -DARDUINO=10803 -DARDUINO_AVR_ATmega32U2 -DARDUINO_ARCH_AVR $(LUFA_OPTS)
+ARCH_FLAGS    = -mmcu=$(MCU) -DF_CPU=16000000L -DARDUINO=10803 -DARDUINO_AVR_ATmega32U2 -DARDUINO_ARCH_AVR $(LUFA_OPTS)
 ARCH_FLAGS += -DARDUINO_MODEL_PID=$(ARDUINO_MODEL_PID)
 ARCH_FLAGS += -DBOARD=BOARD_$(BOARD)
-ARCH_FLAGS += -DF_CLOCK=$(F_CLOCK)
+ARCH_FLAGS += -DF_USB=$(F_USB)
 ARCH_FLAGS += -DAVR_RESET_LINE_PORT="PORTD"
 ARCH_FLAGS += -DAVR_RESET_LINE_DDR="DDRD"
 ARCH_FLAGS += -DAVR_RESET_LINE_MASK="(1 << 7)"
-ARCH_FLAGS += -DTX_RX_LED_PULSE_MS=3
-ARCH_FLAGS += -DPING_PONG_LED_PULSE_MS=100
+#ARCH_FLAGS += -DTX_RX_LED_PULSE_MS=3
+#ARCH_FLAGS += -DPING_PONG_LED_PULSE_MS=100
 ARCH_FLAGS += -DARDUINO=1
 
 CFLAGS	  = -std=gnu11 $(COMPILE_FLAGS) $(FEATURE_FLAGS) $(LINK_FLAGS) $(ARCH_FLAGS)
@@ -62,18 +70,14 @@ CXXFLAGS     += -fpermissive -fno-exceptions -fno-threadsafe-statics -fno-rtti
 
 LDFLAGS = $(OPTIM_FLAGS) $(WARN_FLAGS) -flto -fuse-linker-plugin -mrelax $(LINK_FLAGS) $(ARCH_FLAGS)
 
-DIRS = SdFat SdFat/SdCard SdFat/FatLib SdFat/SpiDriver SdFat/SpiDriver/boards MCL SPI $(LUFA_PATH)
+#DIRS = SdFat SdFat/SdCard SdFat/FatLib SdFat/SpiDriver SdFat/SpiDriver/boards SPI
 
-LDIRS = $(foreach dir,$(DIRS),$(CORE_DIR)/$(dir)) ${CORE_DIR} ${VARIENTS_DIR}
+LDIRS = $(foreach dir,$(DIRS),$(CORE_DIR)/$(dir)) ${CORE_DIR} ${VARIENTS_DIR} ${HOME_DIR}/LUFA_210130
 
 $(info  LDIRS is $(LDIRS))
 INCS = -I. $(foreach dir,$(LDIRS),-I$(dir))
 OBJS = $(foreach dir,$(LDIRS),$(foreach file,$(wildcard $(dir)/*.cpp),$(subst .cpp,.o,$(file))))
 OBJS += $(foreach dir,$(LDIRS),$(foreach file,$(wildcard $(dir)/*.c),$(subst .c,.o,$(file))))
-
-
-# Path to the LUFA library
-LUFA_PATH = ../LUFA_100807
 
 
 # LUFA library compile-time options
@@ -85,31 +89,35 @@ LUFA_OPTS += -D INTERRUPT_CONTROL_ENDPOINT
 LUFA_OPTS += -D DEVICE_STATE_AS_GPIOR=0
 LUFA_OPTS += -D USE_STATIC_OPTIONS="(USB_DEVICE_OPT_FULLSPEED | USB_OPT_REG_ENABLED | USB_OPT_AUTO_PLL)"
 
+CPPSRC = $(TARGET).cpp
+SRC = Descriptors.c $(LUFA_SRC_USB) $(LUFA_SRC_USBCLASS)
 # Create the LUFA source path variables by including the LUFA root makefile
-include $(LUFA_PATH)/LUFA/makefile
+include $(LUFA_PATH)/makefile
 
 # List C source files here. (C dependencies are automatically generated.)
-SRC = $(TARGET).c\
-	Descriptors.c\
-    $(LUFA_SRC_USB) \
-	$(LUFA_SRC_USBCLASS)    \
-	$(LUFA_PATH)/LUFA/Drivers/USB/LowLevel/Device.c \
-	$(LUFA_PATH)/LUFA/Drivers/USB/LowLevel/Endpoint.c	     \
-	$(LUFA_PATH)/LUFA/Drivers/USB/HighLevel/HostStandardReq.c   \
-	$(LUFA_PATH)/LUFA/Drivers/USB/LowLevel/Host.c   \
-	$(LUFA_PATH)/LUFA/Drivers/USB/LowLevel/Pipe.c   \
-	$(LUFA_PATH)/LUFA/Drivers/USB/LowLevel/USBController.c	\
-	$(LUFA_PATH)/LUFA/Drivers/USB/HighLevel/Events.c \
-	$(LUFA_PATH)/LUFA/Drivers/USB/LowLevel/USBInterrupt.c \
-	$(LUFA_PATH)/LUFA/Drivers/USB/HighLevel/USBTask.c \
-	$(LUFA_PATH)/LUFA/Drivers/USB/HighLevel/DeviceStandardReq.c \
-	$(LUFA_PATH)/LUFA/Drivers/USB/HighLevel/ConfigDescriptor.c  \
-	$(LUFA_PATH)/LUFA/Drivers/USB/Class/Device/CDC.c \
-	$(LUFA_PATH)/LUFA/Drivers/USB/Class/Host/CDC.c 
+#DMBS_LUFA_PATH ?= $(LUFA_PATH)/Build/LUFA
+#include $(DMBS_LUFA_PATH)/lufa-sources.mk
+#include $(DMBS_LUFA_PATH)/lufa-gcc.mk
 
-OBJS += $(SRC:%.c=./%.o) $(CPPSRC:%.cpp=./%.o)  
+# Include LUFA build script makefiles
 
-#$(info    OBJS is $(OBJS))
+include $(LUFA_PATH)/Build/lufa_core.mk
+include $(LUFA_PATH)/Build/lufa_sources.mk
+include $(LUFA_PATH)/Build/lufa_build.mk
+include $(LUFA_PATH)/Build/lufa_cppcheck.mk
+include $(LUFA_PATH)/Build/lufa_doxygen.mk
+include $(LUFA_PATH)/Build/lufa_dfu.mk
+include $(LUFA_PATH)/Build/lufa_hid.mk
+include $(LUFA_PATH)/Build/lufa_avrdude.mk
+include $(LUFA_PATH)/Build/lufa_atprogram.mk
+
+
+$(info SRC is $(SRC))
+
+OBJS += $(SRC:%.c=%.o) $(CPPSRC:%.cpp=%.o)
+
+$(info OBJS is $(OBJS))
+
 DFILES = $(foreach obj,$(OBJS),$(subst .o,.d,$(obj)))
 CFLAGS += $(INCS)
 CXXFLAGS += $(INCS)

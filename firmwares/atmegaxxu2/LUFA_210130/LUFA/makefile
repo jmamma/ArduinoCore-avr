@@ -8,18 +8,20 @@
 # ---------------------------------------
 #  Makefile for the LUFA library itself.
 # ---------------------------------------
-
-LUFA_VERSION_NUM := $(shell grep LUFA_VERSION_STRING Version.h | cut -d'"' -f2)
+all:
+	@echo "HERE"
+	@echo "LUFA $(LUFA_PATH)"
+#
+LUFA_VERSION_NUM := 210130
 
 # Default target - no default action when attempting to build the core directly
-all:
 
 # Display the LUFA version of this library copy
 version:
 	@echo "LUFA $(LUFA_VERSION_NUM)"
 
-LUFA_PATH               := .
-ARCH                    := {AVR8,UC3,XMEGA}
+LUFA_PATH               := /Users/jmamma/dev/ArduinoCore-avr/firmwares/atmegaxxu2/LUFA_210130/LUFA
+ARCH                    := AVR8
 DOXYGEN_OVERRIDE_PARAMS := QUIET=YES PROJECT_NUMBER=$(LUFA_VERSION_NUM)
 
 # Remove all object and associated files from the LUFA library core

@@ -50,12 +50,11 @@
 #include "Lib/LightweightRingBuff.h"
 
 #include <LUFA/Version.h>
-#include <LUFA/Drivers/Board/LEDs.h>
 #include <LUFA/Drivers/Peripheral/Serial.h>
 #include <LUFA/Drivers/USB/USB.h>
-#include <LUFA/Drivers/USB/Class/CDC.h>
 
 #include <LUFA/Common/Common.h>
+#include <c_structs.h>
 
 /* Macros: */
 /** LED mask for the library LED driver, to indicate TX activity. */
