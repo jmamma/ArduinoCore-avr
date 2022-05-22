@@ -51,6 +51,12 @@ uint32_t Boot_Key ATTR_NO_INIT;
 #define MAGIC_BOOT_KEY 0xDC42ACCA
 #define BOOTLOADER_START_ADDRESS 0x7000
 
+#define SET_BIT(x, y) ((x) |= (1 << (y)))
+#define CLEAR_BIT(x, y) ((x) &= ~(1 << (y)))
+
+#define UART_SET_ISR_TX_BIT() SET_BIT(UCSR1B, UDRIE1);
+#define UART_CLEAR_ISR_TX_BIT() CLEAR_BIT(UCSR1B, UDRIE1);
+
 void Bootloader_Jump_Check(void) ATTR_INIT_SECTION(3);
 void Bootloader_Jump_Check(void) {
   // If the reset source was the bootloader and the key is correct, clear it and
@@ -79,20 +85,11 @@ void Jump_To_Bootloader(void) {
     ;
 }
 
-void send_byte(char c) {
-
-  if (USB_DeviceState == DEVICE_STATE_Configured) {
-    RingBuffer_Insert(&USARTtoUSB_Buffer, c);
-    RingBuffer_Insert(&USARTtoUSB_Buffer, '\r');
-    RingBuffer_Insert(&USARTtoUSB_Buffer, '\n');
-  }
-}
-
 int main(void) {
-  usb_mode = USB_MIDI;
+  usb_mode = USB_SERIAL;
 
   SetupHardware();
-  
+
   RingBuffer_InitBuffer(&USBtoUSART_Buffer);
   RingBuffer_InitBuffer(&USARTtoUSB_Buffer);
   sei();
@@ -129,6 +126,7 @@ void USB_Serial() {
      */
     if (!(ReceivedByte < 0))
       RingBuffer_Insert(&USBtoUSART_Buffer, ReceivedByte);
+    UART_SET_ISR_TX_BIT();
   }
   //   if (USB_DeviceState == DEVICE_STATE_Configured) {
   //  CDC_Device_SendByte(&VirtualSerial_CDC_Interface,0xFF);
@@ -141,11 +139,6 @@ void USB_Serial() {
   if ((TIFR0 & (1 << TOV0)) || (BufferCount > BUFFER_NEARLY_FULL)) {
     TIFR0 |= (1 << TOV0);
 
-    if (USARTtoUSB_Buffer.Count) {
-      //   LEDs_TurnOnLEDs(LEDMASK_TX);
-      //   PulseMSRemaining.TxLEDPulse = TX_RX_LED_PULSE_MS;
-    }
-
     /* Read bytes from the USART receive buffer into the USB IN endpoint */
     while (BufferCount--)
       CDC_Device_SendByte(&VirtualSerial_CDC_Interface,
@@ -153,34 +146,220 @@ void USB_Serial() {
   }
 
   /* Load the next byte from the USART transmit buffer into the USART */
-  if (!(RingBuffer_IsEmpty(&USBtoUSART_Buffer))) {
-    Serial_SendByte(RingBuffer_Remove(&USBtoUSART_Buffer));
-  }
 
   CDC_Device_USBTask(&VirtualSerial_CDC_Interface);
 }
 
+/**
+ ** Voice category messages
+ **/
+#define MIDI_NOTE_OFF 0x80         /* 2 bytes data */
+#define MIDI_NOTE_ON 0x90          /* 2 bytes data */
+#define MIDI_AFTER_TOUCH 0xA0      /* 2 bytes data */
+#define MIDI_CONTROL_CHANGE 0xB0   /* 2 bytes data */
+#define MIDI_PROGRAM_CHANGE 0xC0   /* 1 byte data */
+#define MIDI_CHANNEL_PRESSURE 0xD0 /* 1 byte data */
+#define MIDI_PITCH_WHEEL 0xE0      /* 2 bytes data */
+
+/**
+ ** System common category messages
+ **/
+#define MIDI_SYSEX_START 0xF0
+#define MIDI_SYSEX_END 0xF7
+#define MIDI_MTC_QUARTER_FRAME 0xF1 /* 1 byte data */
+#define MIDI_SONG_POSITION_PTR 0xF2 /* 2 bytes data */
+#define MIDI_SONG_SELECT 0xF3       /* 1 byte data */
+#define MIDI_TUNE_REQUEST 0xF6      /* no data */
+
+/**
+ ** Realtime category messages, can be sent anytime
+ **/
+#define MIDI_CLOCK 0xF8        /* no data */
+#define MIDI_TICK 0xF9         /* no data */
+#define MIDI_START 0xFA        /* no data */
+#define MIDI_CONTINUE 0xFB     /* no data */
+#define MIDI_STOP 0xFC         /* no data */
+#define MIDI_ACTIVE_SENSE 0xFE /* no data */
+#define MIDI_RESET 0xFF        /* no data */
+
+#define MIDI_IS_STATUS_BYTE(b) ((b)&0x80)
+#define MIDI_IS_VOICE_STATUS_BYTE(b) ((b) <= 0xEF)
+#define MIDI_VOICE_TYPE_NIBBLE(b) ((b)&0xF0)
+#define MIDI_VOICE_CHANNEL(b) ((b)&0x0F)
+
+#define MIDI_IS_SYSCOMMON_STATUS_BYTE(b) (((b) >= 0xF0) & ((b) < 0xF8))
+#define MIDI_IS_REALTIME_STATUS_BYTE(b) ((b) >= 0xF8)
+
+int message_len = 0;
+uint8_t data_cnt = 0;
+bool in_sysex = 0;
+MIDI_EventPacket_t SendMIDIEvent;
+
 void USB_Midi() {
-    Endpoint_SelectEndpoint(MIDI_STREAM_IN_EPADDR);
 
-    if (Endpoint_IsINReady()) {
-       if (!(RingBuffer_IsEmpty(&USBtoUSART_Buffer))) {
-       Endpoint_Write_8(RingBuffer_Remove(&USBtoUSART_Buffer));
-    //   Endpoint_ClearIN();
-       }
-    }
-        /* Select the MIDI OUT stream */
-    Endpoint_SelectEndpoint(MIDI_STREAM_OUT_EPADDR);
+  MIDI_EventPacket_t ReceivedMIDIEvent;
+  uint8_t *ptr;
 
-    /* Check if a MIDI command has been received */
-    if (Endpoint_IsOUTReceived()) {
-    //Endpoint_Read_Stream_LE(c, 1, NULL);
-      uint8_t c = Endpoint_Read_8();
-      RingBuffer_Insert(&USBtoUSART_Buffer, c);
+  while (
+      MIDI_Device_ReceiveEventPacket(&USB_MIDI_Interface, &ReceivedMIDIEvent)) {
+    ptr = ((uint8_t *)&ReceivedMIDIEvent);
+
+    uint8_t cin = (*ptr) & 0x0F;
+    uint8_t len = 0;
+
+    switch (cin) {
+    default:
+      continue;
+    case 0x5:
+    case 0xF: {
+      len = 1;
+      break;
     }
-    /* General management task for a given MIDI class interface, required for the correct operation of the interface.
-     * This should be called frequently in the main program loop, before the master USB management task USB_USBTask(). */
-    MIDI_Device_USBTask(&USB_MIDI_Interface);
+    case 0x2:
+    case 0x6:
+    case 0xC:
+    case 0xD: {
+      len = 2;
+      break;
+    }
+    case 0x3:
+    case 0x4:
+    case 0x7:
+    case 0x8:
+    case 0x9:
+    case 0xA:
+    case 0xB:
+    case 0xE: {
+      len = 3;
+      break;
+    }
+    }
+
+    ptr++;
+    for (uint8_t n = 0; n < len; n++) {
+      RingBuffer_Insert(&USBtoUSART_Buffer, ptr[n]);
+    }
+    UART_SET_ISR_TX_BIT();
+  }
+
+  RingBuff_Count_t BufferCount = RingBuffer_GetCount(&USARTtoUSB_Buffer);
+  if ((TIFR0 & (1 << TOV0)) || (BufferCount > BUFFER_NEARLY_FULL)) {
+    TIFR0 |= (1 << TOV0);
+
+    ptr = ((uint8_t *)&SendMIDIEvent);
+    while (BufferCount--) {
+      uint8_t c = RingBuffer_Remove(&USARTtoUSB_Buffer);
+      bool send = false;
+
+      // STATUS BYTES
+      if (MIDI_IS_STATUS_BYTE(c)) {
+        message_len = -1;
+
+        switch (c & 0xF0) {
+        case DEFAULT:
+          ptr[0] = 0xF; // Single byte, Realtime
+          message_len = 0;
+          break;
+        case MIDI_MTC_QUARTER_FRAME:
+          ptr[0] = 0x2;
+          message_len = 1;
+          break;
+        case MIDI_SONG_POSITION_PTR:
+          ptr[0] = 0x3;
+          message_len = 2;
+          break;
+        case MIDI_SONG_SELECT:
+          ptr[0] = 0x2;
+          message_len = 1;
+          break;
+        case MIDI_TUNE_REQUEST:
+          ptr[0] = 0x5;
+          message_len = 0;
+          break;
+        case MIDI_NOTE_OFF:
+          ptr[0] = 0x8;
+          message_len = 2;
+        case MIDI_NOTE_ON:
+          ptr[0] = 0x9;
+          message_len = 2;
+        case MIDI_AFTER_TOUCH:
+          ptr[0] = 0xA;
+          message_len = 0x3;
+        case MIDI_CONTROL_CHANGE:
+          ptr[0] = 0xB;
+          message_len = 0x3;
+        case MIDI_CHANNEL_PRESSURE:
+          ptr[0] = 0xC;
+          message_len = 1;
+          break;
+        case MIDI_PROGRAM_CHANGE:
+          ptr[0] = 0xD;
+          message_len = 1;
+          break;
+        case MIDI_PITCH_WHEEL:
+          ptr[0] = 0xE;
+          message_len = 2;
+          break;
+        case MIDI_SYSEX_START:
+          ptr[0] = 0x4;
+          in_sysex = 1;
+          break;
+        case MIDI_SYSEX_END:
+          if (!in_sysex)
+            break; // error
+          in_sysex = 1;
+          if (data_cnt == 2) {
+            ptr[0] = 0x6;
+            ptr[3] = 0xF7;
+          }
+          if (data_cnt == 3) {
+            ptr[0] = 0x7;
+            ptr[2] = 0xF7;
+            ptr[3] = 0x00;
+          }
+          break;
+        }
+        data_cnt = 0;
+
+        if (message_len >= 0) {
+          in_sysex = 0;
+          ptr[1] = c;
+          ptr[2] = 0;
+          ptr[3] = 0;
+        }
+        if (message_len == 0) {
+          send = true; // 0 data message. send immediately.
+        }
+      } else {
+        // Data
+        if (in_sysex) {
+          ptr[1 + data_cnt] = c;
+          data_cnt++;
+          if (data_cnt == 3) {
+            data_cnt = 0;
+            ptr[0] = 0x4; // Sysex continues;
+            send = true;
+          }
+        } else {
+          ptr[1 + data_cnt] = c;
+          data_cnt++;
+          message_len--;
+          if (message_len == 0) {
+            send = true;
+          }
+        }
+      }
+      if (send) {
+        MIDI_Device_SendEventPacket(&USB_MIDI_Interface, &SendMIDIEvent);
+        MIDI_Device_Flush(&USB_MIDI_Interface);
+      }
+    }
+  }
+  /* General management task for a given MIDI class interface, required for
+   * the correct operation of the interface.
+   * This should be called frequently in the main program loop, before the
+   * master USB management task USB_USBTask(). */
+  MIDI_Device_USBTask(&USB_MIDI_Interface);
 }
 
 /** Configures the board hardware and chip peripherals for the demo's
@@ -212,17 +391,17 @@ void SetupHardware(void) {
 
 /** Event handler for the library USB Configuration Changed event. */
 void EVENT_USB_Device_ConfigurationChanged(void) {
-  bool ConfigSuccess = true;
 
   switch (usb_mode) {
   case USB_SERIAL:
-    ConfigSuccess &=
-        CDC_Device_ConfigureEndpoints(&VirtualSerial_CDC_Interface);
+    CDC_Device_ConfigureEndpoints(&VirtualSerial_CDC_Interface);
     break;
   case USB_MIDI:
-    //ConfigSuccess &= Endpoint_ConfigureEndpoint(MIDI_STREAM_IN_EPADDR, EP_TYPE_BULK, MIDI_STREAM_EPSIZE, 1); 
-    //ConfigSuccess &= Endpoint_ConfigureEndpoint(MIDI_STREAM_OUT_EPADDR, EP_TYPE_BULK, MIDI_STREAM_EPSIZE, 1); 
-    ConfigSuccess &= MIDI_Device_ConfigureEndpoints(&USB_MIDI_Interface);
+    // ConfigSuccess &= Endpoint_ConfigureEndpoint(MIDI_STREAM_IN_EPADDR,
+    // EP_TYPE_BULK, MIDI_STREAM_EPSIZE, 1); ConfigSuccess &=
+    // Endpoint_ConfigureEndpoint(MIDI_STREAM_OUT_EPADDR, EP_TYPE_BULK,
+    // MIDI_STREAM_EPSIZE, 1);
+    MIDI_Device_ConfigureEndpoints(&USB_MIDI_Interface);
     break;
   }
 }
@@ -293,6 +472,15 @@ ISR(USART1_RX_vect, ISR_BLOCK) {
   uint8_t ReceivedByte = UDR1;
   if (USB_DeviceState == DEVICE_STATE_Configured)
     RingBuffer_Insert(&USARTtoUSB_Buffer, ReceivedByte);
+}
+
+ISR(USART1_UDRE_vect) {
+  if (!(RingBuffer_IsEmpty(&USBtoUSART_Buffer))) {
+    UDR1 = RingBuffer_Remove(&USBtoUSART_Buffer);
+  }
+  if ((RingBuffer_IsEmpty(&USBtoUSART_Buffer))) {
+    UART_CLEAR_ISR_TX_BIT();
+  }
 }
 
 /** Event handler for the CDC Class driver Host-to-Device Line Encoding
