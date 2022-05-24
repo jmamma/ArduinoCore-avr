@@ -86,7 +86,7 @@ void Jump_To_Bootloader(void) {
 }
 
 int main(void) {
-  usb_mode = USB_SERIAL;
+  usb_mode = USB_MIDI;
 
   SetupHardware();
 
@@ -279,15 +279,19 @@ void USB_Midi() {
         case MIDI_NOTE_OFF:
           ptr[0] = 0x8;
           message_len = 2;
+          break;
         case MIDI_NOTE_ON:
           ptr[0] = 0x9;
           message_len = 2;
+          break;
         case MIDI_AFTER_TOUCH:
           ptr[0] = 0xA;
           message_len = 0x3;
+          break;
         case MIDI_CONTROL_CHANGE:
           ptr[0] = 0xB;
           message_len = 0x3;
+          break;
         case MIDI_CHANNEL_PRESSURE:
           ptr[0] = 0xC;
           message_len = 1;
@@ -372,8 +376,7 @@ void SetupHardware(void) {
   /* Hardware Initialization */
   if (usb_mode == USB_SERIAL) {
     Serial_Init(9600, false);
-  }
-  else {
+  } else {
     uint32_t speed = 31250;
     uint32_t cpu = (F_CPU / 16);
     cpu /= speed;
