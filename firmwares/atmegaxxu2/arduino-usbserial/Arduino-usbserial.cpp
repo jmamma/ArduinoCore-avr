@@ -370,7 +370,22 @@ void SetupHardware(void) {
   wdt_disable();
 
   /* Hardware Initialization */
-  Serial_Init(9600, false);
+  if (usb_mode == USB_SERIAL) {
+    Serial_Init(9600, false);
+  }
+  else {
+    uint32_t speed = 31250;
+    uint32_t cpu = (F_CPU / 16);
+    cpu /= speed;
+    cpu--;
+
+    UBRR1H = ((cpu >> 8) & 0xFF);
+    UBRR1L = (cpu & 0xFF);
+
+    UCSR1A = (3 << UCSZ10);
+    UCSR1B = ((1 << RXCIE1) | (1 << TXEN1) | (1 << RXEN1));
+  }
+
   USB_Init();
 
   /* Start the flush timer so that overflows occur rapidly to push received
@@ -385,8 +400,10 @@ void SetupHardware(void) {
   PORTC = (1 << PC2) | (1 << PC4) | (1 << PC5);
 
   /* Pull target /RESET line high */
-  AVR_RESET_LINE_PORT |= AVR_RESET_LINE_MASK;
-  AVR_RESET_LINE_DDR |= AVR_RESET_LINE_MASK;
+  if (usb_mode == USB_MIDI) {
+    AVR_RESET_LINE_PORT |= AVR_RESET_LINE_MASK;
+    AVR_RESET_LINE_DDR |= AVR_RESET_LINE_MASK;
+  }
 }
 
 /** Event handler for the library USB Configuration Changed event. */
@@ -397,10 +414,6 @@ void EVENT_USB_Device_ConfigurationChanged(void) {
     CDC_Device_ConfigureEndpoints(&VirtualSerial_CDC_Interface);
     break;
   case USB_MIDI:
-    // ConfigSuccess &= Endpoint_ConfigureEndpoint(MIDI_STREAM_IN_EPADDR,
-    // EP_TYPE_BULK, MIDI_STREAM_EPSIZE, 1); ConfigSuccess &=
-    // Endpoint_ConfigureEndpoint(MIDI_STREAM_OUT_EPADDR, EP_TYPE_BULK,
-    // MIDI_STREAM_EPSIZE, 1);
     MIDI_Device_ConfigureEndpoints(&USB_MIDI_Interface);
     break;
   }
