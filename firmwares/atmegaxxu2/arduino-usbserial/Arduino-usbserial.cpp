@@ -190,9 +190,10 @@ void USB_Serial() {
 #define MIDI_IS_SYSCOMMON_STATUS_BYTE(b) (((b) >= 0xF0) & ((b) < 0xF8))
 #define MIDI_IS_REALTIME_STATUS_BYTE(b) ((b) >= 0xF8)
 
-int message_len = 0;
+int8_t message_len = 0;
 uint8_t data_cnt = 0;
 bool in_sysex = 0;
+bool special_case = false;
 MIDI_EventPacket_t SendMIDIEvent;
 
 void USB_Midi() {
@@ -202,7 +203,7 @@ void USB_Midi() {
 
   while (
       MIDI_Device_ReceiveEventPacket(&USB_MIDI_Interface, &ReceivedMIDIEvent)) {
-    ptr = ((uint8_t *)&ReceivedMIDIEvent);
+    uint8_t *ptr = ((uint8_t *)&ReceivedMIDIEvent);
 
     uint8_t cin = (*ptr) & 0x0F;
     uint8_t len = 0;
@@ -246,82 +247,109 @@ void USB_Midi() {
   if ((TIFR0 & (1 << TOV0)) || (BufferCount > BUFFER_NEARLY_FULL)) {
     TIFR0 |= (1 << TOV0);
 
-    ptr = ((uint8_t *)&SendMIDIEvent);
+    uint8_t *ptr = ((uint8_t *)&SendMIDIEvent);
     while (BufferCount--) {
       uint8_t c = RingBuffer_Remove(&USARTtoUSB_Buffer);
       bool send = false;
-
       // STATUS BYTES
       if (MIDI_IS_STATUS_BYTE(c)) {
         message_len = -1;
-
-        switch (c & 0xF0) {
-        case DEFAULT:
-          ptr[0] = 0xF; // Single byte, Realtime
-          message_len = 0;
-          break;
-        case MIDI_MTC_QUARTER_FRAME:
-          ptr[0] = 0x2;
-          message_len = 1;
-          break;
-        case MIDI_SONG_POSITION_PTR:
-          ptr[0] = 0x3;
-          message_len = 2;
-          break;
-        case MIDI_SONG_SELECT:
-          ptr[0] = 0x2;
-          message_len = 1;
-          break;
-        case MIDI_TUNE_REQUEST:
-          ptr[0] = 0x5;
-          message_len = 0;
-          break;
-        case MIDI_NOTE_OFF:
-          ptr[0] = 0x8;
-          message_len = 2;
-          break;
-        case MIDI_NOTE_ON:
-          ptr[0] = 0x9;
-          message_len = 2;
-          break;
-        case MIDI_AFTER_TOUCH:
-          ptr[0] = 0xA;
-          message_len = 0x3;
-          break;
-        case MIDI_CONTROL_CHANGE:
-          ptr[0] = 0xB;
-          message_len = 0x3;
-          break;
-        case MIDI_CHANNEL_PRESSURE:
-          ptr[0] = 0xC;
-          message_len = 1;
-          break;
-        case MIDI_PROGRAM_CHANGE:
-          ptr[0] = 0xD;
-          message_len = 1;
-          break;
-        case MIDI_PITCH_WHEEL:
-          ptr[0] = 0xE;
-          message_len = 2;
-          break;
-        case MIDI_SYSEX_START:
-          ptr[0] = 0x4;
-          in_sysex = 1;
-          break;
-        case MIDI_SYSEX_END:
-          if (!in_sysex)
-            break; // error
-          in_sysex = 1;
-          if (data_cnt == 2) {
-            ptr[0] = 0x6;
-            ptr[3] = 0xF7;
+        if (c < 0xF0) {
+          switch (c & 0xF0) {
+          case MIDI_MTC_QUARTER_FRAME:
+            ptr[0] = 0x2;
+            message_len = 1;
+            break;
+          case MIDI_SONG_POSITION_PTR:
+            ptr[0] = 0x3;
+            message_len = 2;
+            break;
+          case MIDI_SONG_SELECT:
+            ptr[0] = 0x2;
+            message_len = 1;
+            break;
+          case MIDI_TUNE_REQUEST:
+            ptr[0] = 0x5;
+            message_len = 0;
+            break;
+          case MIDI_NOTE_OFF:
+            ptr[0] = 0x8;
+            message_len = 2;
+            break;
+          case MIDI_NOTE_ON:
+            ptr[0] = 0x9;
+            message_len = 2;
+            break;
+          case MIDI_AFTER_TOUCH:
+            ptr[0] = 0xA;
+            message_len = 2;
+            break;
+          case MIDI_CONTROL_CHANGE:
+            ptr[0] = 0xB;
+            message_len = 2;
+            break;
+          case MIDI_CHANNEL_PRESSURE:
+            ptr[0] = 0xC;
+            message_len = 1;
+            break;
+          case MIDI_PROGRAM_CHANGE:
+            ptr[0] = 0xD;
+            message_len = 1;
+            break;
+          case MIDI_PITCH_WHEEL:
+            ptr[0] = 0xE;
+            message_len = 2;
+            break;
           }
-          if (data_cnt == 3) {
-            ptr[0] = 0x7;
-            ptr[2] = 0xF7;
-            ptr[3] = 0x00;
+        } else {
+          switch (c) {
+          default:
+            ptr[0] = 0xF; // Single uint8_t, Realtime
+            message_len = 0;
+            break;
+          case MIDI_SYSEX_START:
+            ptr[0] = 0x4;
+            in_sysex = 1;
+            special_case = true;
+            break;
+          case MIDI_SYSEX_END:
+            if (!in_sysex)
+              break; // error
+            printf("end %d\n", data_cnt);
+            in_sysex = 0;
+            send = true;
+            if (special_case) {
+              printf("special");
+              if (data_cnt == 1) {
+                ptr[0] = 0x6;
+                ptr[1] = 0xF0;
+                ptr[2] = 0xF7;
+                ptr[3] = 0x00;
+              }
+              if (data_cnt == 2) {
+                ptr[0] = 0x7;
+                ptr[1] = 0xF0;
+                ptr[3] = 0xF7;
+              }
+            } else {
+              if (data_cnt == 0) {
+                ptr[0] = 0x5;
+                ptr[1] = 0xF7;
+                ptr[2] = 0x00;
+                ptr[3] = 0x00;
+              }
+              if (data_cnt == 1) {
+                ptr[0] = 0x6;
+                ptr[2] = 0xF7;
+                ptr[3] = 0x00;
+              }
+              if (data_cnt == 2) {
+                ptr[0] = 0x7;
+                ptr[3] = 0xF7;
+              }
+            }
+            break;
           }
-          break;
         }
         data_cnt = 0;
 
@@ -330,27 +358,28 @@ void USB_Midi() {
           ptr[1] = c;
           ptr[2] = 0;
           ptr[3] = 0;
+          data_cnt++;
         }
         if (message_len == 0) {
           send = true; // 0 data message. send immediately.
         }
-      } else {
-        // Data
-        if (in_sysex) {
-          ptr[1 + data_cnt] = c;
-          data_cnt++;
-          if (data_cnt == 3) {
-            data_cnt = 0;
-            ptr[0] = 0x4; // Sysex continues;
-            send = true;
-          }
-        } else {
-          ptr[1 + data_cnt] = c;
-          data_cnt++;
-          message_len--;
-          if (message_len == 0) {
-            send = true;
-          }
+      } else if (message_len > 0) {
+        ptr[1 + data_cnt] = c;
+        data_cnt++;
+        message_len--;
+        if (message_len == 0) {
+          send = true;
+        }
+      }
+      // Data
+      if (in_sysex) {
+        ptr[1 + data_cnt] = c;
+        data_cnt++;
+        if (data_cnt == 3) {
+          data_cnt = 0;
+          ptr[0] = 0x4; // Sysex continues;
+          send = true;
+          special_case = false;
         }
       }
       if (send) {
@@ -385,7 +414,7 @@ void SetupHardware(void) {
     UBRR1H = ((cpu >> 8) & 0xFF);
     UBRR1L = (cpu & 0xFF);
 
-    UCSR1A = (3 << UCSZ10);
+    //    UCSR1A = (3 << UCSZ10);
     UCSR1B = ((1 << RXCIE1) | (1 << TXEN1) | (1 << RXEN1));
   }
 
