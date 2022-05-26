@@ -28,13 +28,6 @@
   this software.
 */
 
-/** \file
- *
- *  Main source file for the Arduino-usbserial project. This file contains the
- * main tasks of the project and is responsible for the initial application
- * hardware configuration.
- */
-
 #include "megacmd-usb.h"
 #include "Arduino.h"
 #include <util/delay.h>
