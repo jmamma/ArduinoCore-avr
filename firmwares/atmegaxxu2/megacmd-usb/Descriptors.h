@@ -62,8 +62,10 @@
         /** Size in bytes of the CDC data IN and OUT endpoints. */
         #define CDC_TXRX_EPSIZE                64
 
-        #define USB_SERIAL 0x00
-        #define USB_MIDI   0x01
+        #define USB_SERIAL  0b00
+        #define USB_MIDI    0b10
+        #define USB_STORAGE 0b01
+        #define USB_DFU     0b11
 
         /* Type Defines: */
         /** Type define for the device configuration descriptor structure. This must be defined in the

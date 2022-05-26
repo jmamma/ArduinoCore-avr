@@ -28,8 +28,8 @@
   this software.
 */
 
-#include "megacmd-usb.h"
 #include "Arduino.h"
+#include "megacmd-usb.h"
 #include <util/delay.h>
 
 /** Circular buffer to hold data from the host before it is sent to the device
@@ -81,6 +81,20 @@ void Jump_To_Bootloader(void) {
 int main(void) {
   usb_mode = USB_MIDI;
 
+    /* Set PORTC input */
+  DDRC = 0;
+  PORTC = 0;
+  // PC7 is output, used for SD Card select.
+  // PC2 is output, used for indicating official MegaCMD. active high
+  DDRC |= (1 << PC7) | (1 << PC2);
+
+  PORTC |= (1 << PC7) | (1 << PC2);
+  // PC4, PC5 are input and should be active high. Therefor enable pullup.
+  PORTC = (1 << PC4) | (1 << PC5);
+
+   _delay_ms(100);
+
+init:
   SetupHardware();
 
   RingBuffer_InitBuffer(&USBtoUSART_Buffer);
@@ -88,11 +102,17 @@ int main(void) {
   sei();
 
   for (;;) {
-    /* Let's run DFU bootloader if PC2 is active low*/
-    if ((PINC & (1 << PC2)) == 0) {
+    uint8_t state = (PINC & (1 << PC4));
+    state |= (PINC & (1 << PC5)) << 1;
+    if (state == USB_DFU) {
       Jump_To_Bootloader();
     }
-
+    if (state != usb_mode) {
+      USB_Disable();
+      cli();
+      usb_mode = state;
+      goto init;
+    }
     if (USB_DeviceState == DEVICE_STATE_Configured) {
       switch (usb_mode) {
       case USB_SERIAL:
@@ -417,15 +437,8 @@ void SetupHardware(void) {
    * bytes to the USB interface */
   TCCR0B = (1 << CS02);
 
-  /* Set PORTC input */
-  DDRC = 0;
-  // PC7 is output, used for SD Card select.
-  DDRC |= (1 << PC7);
-  // PC2, PC4, PC5 are input and should be active low. Therefor enable pullup.
-  PORTC = (1 << PC2) | (1 << PC4) | (1 << PC5);
-
-  /* Pull target /RESET line high */
-  if (usb_mode == USB_MIDI) {
+   /* Pull target /RESET line high */
+  if (usb_mode == USB_SERIAL) {
     AVR_RESET_LINE_PORT |= AVR_RESET_LINE_MASK;
     AVR_RESET_LINE_DDR |= AVR_RESET_LINE_MASK;
   }
