@@ -41,6 +41,8 @@
 
 
 /* Includes: */
+extern "C" {
+
 #include <avr/io.h>
 #include <avr/wdt.h>
 #include <avr/interrupt.h>
@@ -56,8 +58,7 @@
 
 #include <LUFA/Common/Common.h>
 #include <c_structs.h>
-
-extern uint8_t usb_mode;
+}
 
 /* Function Prototypes: */
 void SetupHardware(void);

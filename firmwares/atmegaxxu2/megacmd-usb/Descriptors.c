@@ -36,8 +36,7 @@
  */
 
 #include "Descriptors.h"
-
-uint8_t usb_mode = USB_MIDI;
+#include "common.h"
 
 /* On some devices, there is a factory set internal serial number which can be automatically sent to the host as
  * the device's serial number when the Device Descriptor's .SerialNumStrIndex entry is set to USE_INTERNAL_SERIAL.
@@ -424,13 +423,13 @@ uint16_t CALLBACK_USB_GetDescriptor(const uint16_t wValue,
 		case DTYPE_Configuration:
             switch (usb_mode) {
               case USB_SERIAL:
-              Address = &USB_ConfigurationDescriptor;
-			  Size    = sizeof(USB_Descriptor_Configuration_t);
-              break;
+                Address = &USB_ConfigurationDescriptor;
+     			Size    = sizeof(USB_Descriptor_Configuration_t);
+                break;
               case USB_MIDI:
-              Address = &USB_MIDI_ConfigurationDescriptor;
-			  Size    = sizeof(USB_MIDI_Descriptor_Configuration_t);
-              break;
+                Address = &USB_MIDI_ConfigurationDescriptor;
+        		Size    = sizeof(USB_MIDI_Descriptor_Configuration_t);
+                break;
             }
             break;
 		case DTYPE_String:

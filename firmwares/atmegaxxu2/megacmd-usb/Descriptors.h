@@ -44,8 +44,6 @@
 		#define ARDUINO_UNO_PID				0x0001
 		#define ARDUINO_MEGA2560_PID		0x0010
         #define MEGACMD_PID                 0x0100
-	/* Macros: */
-
     /* Macros: */
         /** Endpoint address of the CDC device-to-host notification IN endpoint. */
         #define CDC_NOTIFICATION_EPADDR        (ENDPOINT_DIR_IN  | 2)
@@ -62,10 +60,10 @@
         /** Size in bytes of the CDC data IN and OUT endpoints. */
         #define CDC_TXRX_EPSIZE                64
 
-        #define USB_SERIAL  0b00
-        #define USB_MIDI    0b10
-        #define USB_STORAGE 0b01
-        #define USB_DFU     0b11
+        #define USB_SERIAL  0
+        #define USB_MIDI    1
+        #define USB_STORAGE 2
+        #define USB_DFU     3
 
         /* Type Defines: */
         /** Type define for the device configuration descriptor structure. This must be defined in the

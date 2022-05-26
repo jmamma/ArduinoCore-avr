@@ -29,8 +29,9 @@
 */
 
 #include "Arduino.h"
-#include "megacmd-usb.h"
 #include <util/delay.h>
+#include "megacmd-usb.h"
+#include "common.h"
 
 /** Circular buffer to hold data from the host before it is sent to the device
  * via the serial port. */
@@ -79,9 +80,8 @@ void Jump_To_Bootloader(void) {
 }
 
 int main(void) {
-  usb_mode = USB_MIDI;
+  usb_mode = 0;
 
-    /* Set PORTC input */
   DDRC = 0;
   PORTC = 0;
   // PC7 is output, used for SD Card select.
@@ -93,7 +93,6 @@ int main(void) {
   PORTC = (1 << PC4) | (1 << PC5);
 
    _delay_ms(100);
-
 init:
   SetupHardware();
 
@@ -107,12 +106,13 @@ init:
     if (state == USB_DFU) {
       Jump_To_Bootloader();
     }
-    if (state != usb_mode) {
+
+/*    if (state != usb_mode) {
       USB_Disable();
       cli();
       usb_mode = state;
       goto init;
-    }
+    } */
     if (USB_DeviceState == DEVICE_STATE_Configured) {
       switch (usb_mode) {
       case USB_SERIAL:
@@ -203,6 +203,7 @@ void USB_Serial() {
 #define MIDI_IS_SYSCOMMON_STATUS_BYTE(b) (((b) >= 0xF0) & ((b) < 0xF8))
 #define MIDI_IS_REALTIME_STATUS_BYTE(b) ((b) >= 0xF8)
 
+
 int8_t message_len = 0;
 uint8_t data_cnt = 0;
 bool in_sysex = 0;
@@ -212,7 +213,6 @@ MIDI_EventPacket_t SendMIDIEvent;
 void USB_Midi() {
 
   MIDI_EventPacket_t ReceivedMIDIEvent;
-  uint8_t *ptr;
 
   while (
       MIDI_Device_ReceiveEventPacket(&USB_MIDI_Interface, &ReceivedMIDIEvent)) {
