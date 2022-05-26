@@ -5,7 +5,7 @@ ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 ARDUINO_MODEL_PID = 0x0100 #MegaCMD
 BOARD = USER
 
-TARGET = Arduino-usbserial
+TARGET = megacmd-usb
 
 FORMAT = ihex
 

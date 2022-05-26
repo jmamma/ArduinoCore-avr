@@ -35,7 +35,7 @@
  * hardware configuration.
  */
 
-#include "Arduino-usbserial.h"
+#include "megacmd-usb.h"
 #include "Arduino.h"
 #include <util/delay.h>
 
@@ -406,7 +406,7 @@ void SetupHardware(void) {
   if (usb_mode == USB_SERIAL) {
     Serial_Init(9600, false);
   } else {
-    uint32_t speed = 31250;
+    uint32_t speed = 250000;
     uint32_t cpu = (F_CPU / 16);
     cpu /= speed;
     cpu--;
