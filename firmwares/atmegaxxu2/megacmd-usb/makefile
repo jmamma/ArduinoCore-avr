@@ -184,6 +184,7 @@ libclean:
 	rm -rf $(DFILES)
 
 clean:
+	rm core.a
 	find . -iname '*.d' -exec rm {} \; ; \
 	find . -iname '*.o' -exec rm {} \; ; \
 	find . -iname '*.os' -exec rm {} \; ; \

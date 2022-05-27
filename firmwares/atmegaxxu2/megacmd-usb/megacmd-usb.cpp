@@ -79,20 +79,18 @@ void Jump_To_Bootloader(void) {
 }
 
 int main(void) {
-  usb_mode = USB_MIDI;
+  usb_mode = USB_SERIAL;
 
-    /* Set PORTC input */
+  /* Set PORTC input */
   DDRC = 0;
   PORTC = 0;
   // PC7 is output, used for SD Card select.
   // PC2 is output, used for indicating official MegaCMD. active high
   DDRC |= (1 << PC7) | (1 << PC2);
-
   PORTC |= (1 << PC7) | (1 << PC2);
-  // PC4, PC5 are input and should be active high. Therefor enable pullup.
-  PORTC = (1 << PC4) | (1 << PC5);
 
-   _delay_ms(100);
+  // PC4, PC5 are input and should be active high. Therefor enable pullup.
+  PORTC |= (1 << PC4) | (1 << PC5);
 
 init:
   SetupHardware();
@@ -100,16 +98,23 @@ init:
   RingBuffer_InitBuffer(&USBtoUSART_Buffer);
   RingBuffer_InitBuffer(&USARTtoUSB_Buffer);
   sei();
+  for (uint8_t i = 0; i < 128; i++)
+    _delay_ms(16);
 
   for (;;) {
-    uint8_t state = (PINC & (1 << PC4));
-    state |= (PINC & (1 << PC5)) << 1;
+    bool a = PINC & (1 << PC5);
+    bool b = PINC & (1 << PC4);
+    uint8_t state = (uint8_t)a * 2 + (uint8_t)b;
     if (state == USB_DFU) {
       Jump_To_Bootloader();
+
+      goto init;
     }
     if (state != usb_mode) {
       USB_Disable();
       cli();
+      for (uint8_t i = 0; i < 32; i++)
+        _delay_ms(16);
       usb_mode = state;
       goto init;
     }
@@ -126,7 +131,7 @@ init:
     USB_USBTask();
   }
 }
-
+uint8_t last_state;
 void USB_Serial() {
 
   /* Only try to read in bytes from the CDC interface if the transmit buffer
@@ -141,10 +146,9 @@ void USB_Serial() {
       RingBuffer_Insert(&USBtoUSART_Buffer, ReceivedByte);
     UART_SET_ISR_TX_BIT();
   }
-  //   if (USB_DeviceState == DEVICE_STATE_Configured) {
-  //  CDC_Device_SendByte(&VirtualSerial_CDC_Interface,0xFF);
-
-  // }
+  // if (USB_DeviceState == DEVICE_STATE_Configured) {
+  //   CDC_Device_SendByte(&VirtualSerial_CDC_Interface,state);
+  //}
 
   /* Check if the UART receive buffer flush timer has expired or the buffer
    * is nearly full */
@@ -437,7 +441,7 @@ void SetupHardware(void) {
    * bytes to the USB interface */
   TCCR0B = (1 << CS02);
 
-   /* Pull target /RESET line high */
+  /* Pull target /RESET line high */
   if (usb_mode == USB_SERIAL) {
     AVR_RESET_LINE_PORT |= AVR_RESET_LINE_MASK;
     AVR_RESET_LINE_DDR |= AVR_RESET_LINE_MASK;
