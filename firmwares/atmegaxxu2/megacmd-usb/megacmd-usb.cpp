@@ -85,9 +85,9 @@ int main(void) {
   DDRC = 0;
   PORTC = 0;
   // PC7 is output, used for SD Card select.
-  // PC2 is output, used for indicating official MegaCMD. active high
+  // PC2 is output, used for indicating official MegaCMD. active low
   DDRC |= (1 << PC7) | (1 << PC2);
-  PORTC |= (1 << PC7) | (1 << PC2);
+  PORTC |= (1 << PC7);
 
   // PC4, PC5 are input and should be active high. Therefor enable pullup.
   PORTC |= (1 << PC4) | (1 << PC5);
@@ -98,6 +98,8 @@ init:
   RingBuffer_InitBuffer(&USBtoUSART_Buffer);
   RingBuffer_InitBuffer(&USARTtoUSB_Buffer);
   sei();
+
+  //wait for MegaCMD to boot
   for (uint8_t i = 0; i < 128; i++)
     _delay_ms(16);
 
@@ -106,6 +108,7 @@ init:
     bool b = PINC & (1 << PC4);
     uint8_t state = (uint8_t)a * 2 + (uint8_t)b;
     if (state == USB_DFU) {
+
       Jump_To_Bootloader();
 
       goto init;
