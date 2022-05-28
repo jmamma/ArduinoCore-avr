@@ -33,6 +33,7 @@ void SPIClass::begin()
     uint8_t port = digitalPinToPort(SS);
     uint8_t bit = digitalPinToBitMask(SS);
     volatile uint8_t *reg = portModeRegister(port);
+  
 
     // if the SS pin is not already configured as an output
     // then set it high (to enable the internal pull-up resistor)
@@ -44,6 +45,7 @@ void SPIClass::begin()
     // a general purpose output port (it doesn't influence
     // SPI operations).
     pinMode(SS, OUTPUT);
+    //PORTC |= (1 << _BV(PC7));
 
     // Warning: if the SS pin ever becomes a LOW INPUT then SPI
     // automatically switches to Slave, so the data direction of

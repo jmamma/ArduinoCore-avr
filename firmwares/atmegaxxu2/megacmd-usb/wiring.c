@@ -35,17 +35,13 @@
 #define FRACT_INC ((MICROSECONDS_PER_TIMER0_OVERFLOW % 1000) >> 3)
 #define FRACT_MAX (1000 >> 3)
 
-volatile unsigned long timer0_overflow_count = 0;
+//volatile unsigned long timer0_overflow_count = 0;
 volatile unsigned long timer0_millis = 0;
-static unsigned char timer0_fract = 0;
-
-#if defined(__AVR_ATtiny24__) || defined(__AVR_ATtiny44__) || defined(__AVR_ATtiny84__)
-ISR(TIM0_OVF_vect)
-#else
-ISR(TIMER0_OVF_vect)
-#endif
-{
-	// copy these to local variables so they can be stored in registers
+//static unsigned char timer0_fract = 0;
+//ISR(TIMER1_OVF_vect)
+//{
+    /*
+    // copy these to local variables so they can be stored in registers
 	// (volatile variables must be read from memory on every access)
 	unsigned long m = timer0_millis;
 	unsigned char f = timer0_fract;
@@ -61,11 +57,17 @@ ISR(TIMER0_OVF_vect)
 	timer0_fract = f;
 	timer0_millis = m;
 	timer0_overflow_count++;
+    */
 
+ISR(TIMER1_COMPA_vect) {
+    timer0_millis++;
+    return;
 }
+
 
 unsigned long millis()
 {
+        /*
 	unsigned long m;
 	uint8_t oldSREG = SREG;
 
@@ -74,12 +76,13 @@ unsigned long millis()
 	cli();
 	m = timer0_millis;
 	SREG = oldSREG;
-
-	return m;
+*/
+	return timer0_millis;
 }
 
 unsigned long micros() {
-	unsigned long m;
+/*
+    unsigned long m;
 	uint8_t oldSREG = SREG, t;
 	
 	cli();
@@ -103,6 +106,7 @@ unsigned long micros() {
 	SREG = oldSREG;
 	
 	return ((m << 8) + t) * (64 / clockCyclesPerMicrosecond());
+*/
 }
 
 void delay(unsigned long ms)

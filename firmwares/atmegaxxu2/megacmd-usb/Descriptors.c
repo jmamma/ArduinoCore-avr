@@ -399,6 +399,61 @@ const USB_MIDI_Descriptor_Configuration_t PROGMEM USB_MIDI_ConfigurationDescript
 };
 
 
+const USB_Storage_Descriptor_Configuration_t PROGMEM USB_Storage_ConfigurationDescriptor =
+{
+	.Config =
+		{
+			.Header                 = {.Size = sizeof(USB_Descriptor_Configuration_Header_t), .Type = DTYPE_Configuration},
+
+			.TotalConfigurationSize = sizeof(USB_Descriptor_Configuration_t),
+			.TotalInterfaces        = 1,
+
+			.ConfigurationNumber    = 1,
+			.ConfigurationStrIndex  = NO_DESCRIPTOR,
+
+			.ConfigAttributes       = USB_CONFIG_ATTR_RESERVED,
+
+			.MaxPowerConsumption    = USB_CONFIG_POWER_MA(100)
+		},
+
+	.MS_Interface =
+		{
+			.Header                 = {.Size = sizeof(USB_Descriptor_Interface_t), .Type = DTYPE_Interface},
+
+			.InterfaceNumber        = INTERFACE_ID_MassStorage,
+			.AlternateSetting       = 0,
+
+			.TotalEndpoints         = 2,
+
+			.Class                  = MS_CSCP_MassStorageClass,
+			.SubClass               = MS_CSCP_SCSITransparentSubclass,
+			.Protocol               = MS_CSCP_BulkOnlyTransportProtocol,
+
+			.InterfaceStrIndex      = NO_DESCRIPTOR
+		},
+
+	.MS_DataInEndpoint =
+		{
+			.Header                 = {.Size = sizeof(USB_Descriptor_Endpoint_t), .Type = DTYPE_Endpoint},
+
+			.EndpointAddress        = MASS_STORAGE_IN_EPADDR,
+			.Attributes             = (EP_TYPE_BULK | ENDPOINT_ATTR_NO_SYNC | ENDPOINT_USAGE_DATA),
+			.EndpointSize           = MASS_STORAGE_IO_EPSIZE,
+			.PollingIntervalMS      = 0x05
+		},
+
+	.MS_DataOutEndpoint =
+		{
+			.Header                 = {.Size = sizeof(USB_Descriptor_Endpoint_t), .Type = DTYPE_Endpoint},
+
+			.EndpointAddress        = MASS_STORAGE_OUT_EPADDR,
+			.Attributes             = (EP_TYPE_BULK | ENDPOINT_ATTR_NO_SYNC | ENDPOINT_USAGE_DATA),
+			.EndpointSize           = MASS_STORAGE_IO_EPSIZE,
+			.PollingIntervalMS      = 0x05
+		}
+};
+
+
 /** This function is called by the library when in device mode, and must be overridden (see library "USB Descriptors"
  *  documentation) by the application code so that the address and size of a requested descriptor can be given
  *  to the USB library. When the device receives a Get Descriptor request on the control endpoint, this function
@@ -430,6 +485,10 @@ uint16_t CALLBACK_USB_GetDescriptor(const uint16_t wValue,
               case USB_MIDI:
               Address = &USB_MIDI_ConfigurationDescriptor;
 			  Size    = sizeof(USB_MIDI_Descriptor_Configuration_t);
+              break;
+              case USB_STORAGE:
+              Address = &USB_Storage_ConfigurationDescriptor;
+			  Size    = sizeof(USB_Storage_Descriptor_Configuration_t);
               break;
             }
             break;

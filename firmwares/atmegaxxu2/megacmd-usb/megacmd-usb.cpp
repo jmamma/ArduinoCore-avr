@@ -29,9 +29,9 @@
 */
 
 #include "Arduino.h"
+#include "SDCardManager.h"
 #include "megacmd-usb.h"
 #include <util/delay.h>
-
 /** Circular buffer to hold data from the host before it is sent to the device
  * via the serial port. */
 RingBuff_t USBtoUSART_Buffer;
@@ -77,14 +77,27 @@ void Jump_To_Bootloader(void) {
   for (;;)
     ;
 }
-
+bool is_init = false;
 int main(void) {
-  usb_mode = USB_SERIAL;
+
+  uint8_t state = USB_SERIAL;
+
+  TCCR1B = 0;
+  TCCR1C = 0;
+  TCNT1 = 0;
+  // 1000 Hz (16000000/((249+1)*64))
+  OCR1A = 249;
+  // CTC
+  TCCR1B |= (1 << WGM12);
+  // Prescaler 64
+  TCCR1B |= (1 << CS11) | (1 << CS10);
+  // Output Compare Match A Interrupt Enable
+  TIMSK1 |= (1 << OCIE1A);
 
   /* Set PORTC input */
   DDRC = 0;
   PORTC = 0;
-  // PC7 is output, used for SD Card select.
+  // PC7 is output, used for SD Card select. Active HIGH
   // PC2 is output, used for indicating official MegaCMD. active low
   DDRC |= (1 << PC7) | (1 << PC2);
   PORTC |= (1 << PC7);
@@ -92,49 +105,57 @@ int main(void) {
   // PC4, PC5 are input and should be active high. Therefor enable pullup.
   PORTC |= (1 << PC4) | (1 << PC5);
 
-init:
-  SetupHardware();
+INIT:
+  SetupHardware(state);
 
   RingBuffer_InitBuffer(&USBtoUSART_Buffer);
   RingBuffer_InitBuffer(&USARTtoUSB_Buffer);
   sei();
 
-  //wait for MegaCMD to boot
+  // wait for MegaCMD to boot
   for (uint8_t i = 0; i < 128; i++)
     _delay_ms(16);
 
   for (;;) {
     bool a = PINC & (1 << PC5);
     bool b = PINC & (1 << PC4);
-    uint8_t state = (uint8_t)a * 2 + (uint8_t)b;
+    state = (uint8_t)a * 2 + (uint8_t)b;
     if (state == USB_DFU) {
-
       Jump_To_Bootloader();
-
-      goto init;
     }
     if (state != usb_mode) {
+      USB_Detach();
       USB_Disable();
       cli();
       for (uint8_t i = 0; i < 32; i++)
         _delay_ms(16);
-      usb_mode = state;
-      goto init;
+      goto INIT;
     }
     if (USB_DeviceState == DEVICE_STATE_Configured) {
       switch (usb_mode) {
       case USB_SERIAL:
         USB_Serial();
+      /*  if (!is_init) {
+          if (SDCardManager_Init(8)) {
+            CDC_Device_SendByte(&VirtualSerial_CDC_Interface, 'Y');
+            is_init = true;
+          } else {
+            CDC_Device_SendByte(&VirtualSerial_CDC_Interface, 'N');
+          }
+        }*/
         break;
       case USB_MIDI:
         USB_Midi();
+        break;
+      case USB_STORAGE:
+        MS_Device_USBTask(&Disk_MS_Interface);
         break;
       }
     }
     USB_USBTask();
   }
 }
-uint8_t last_state;
+
 void USB_Serial() {
 
   /* Only try to read in bytes from the CDC interface if the transmit buffer
@@ -155,6 +176,7 @@ void USB_Serial() {
 
   /* Check if the UART receive buffer flush timer has expired or the buffer
    * is nearly full */
+  // 40ms ??
   RingBuff_Count_t BufferCount = RingBuffer_GetCount(&USARTtoUSB_Buffer);
   if ((TIFR0 & (1 << TOV0)) || (BufferCount > BUFFER_NEARLY_FULL)) {
     TIFR0 |= (1 << TOV0);
@@ -417,15 +439,19 @@ void USB_Midi() {
 
 /** Configures the board hardware and chip peripherals for the demo's
  * functionality. */
-void SetupHardware(void) {
+void SetupHardware(uint8_t state) {
   /* Disable watchdog if enabled by bootloader/fuses */
   MCUSR &= ~(1 << WDRF);
   wdt_disable();
+  clock_prescale_set(clock_div_1);
 
   /* Hardware Initialization */
-  if (usb_mode == USB_SERIAL) {
+  switch (state) {
+  case USB_SERIAL: {
     Serial_Init(9600, false);
-  } else {
+    break;
+  }
+  case USB_MIDI: {
     uint32_t speed = 250000;
     uint32_t cpu = (F_CPU / 16);
     cpu /= speed;
@@ -434,9 +460,16 @@ void SetupHardware(void) {
     UBRR1H = ((cpu >> 8) & 0xFF);
     UBRR1L = (cpu & 0xFF);
 
-    //    UCSR1A = (3 << UCSZ10);
     UCSR1B = ((1 << RXCIE1) | (1 << TXEN1) | (1 << RXEN1));
+    break;
   }
+  case USB_STORAGE: {
+    uint8_t count = 4;
+    while (!SDCardManager_Init(8));
+    break;
+  }
+  }
+  usb_mode = state;
 
   USB_Init();
 
@@ -461,12 +494,25 @@ void EVENT_USB_Device_ConfigurationChanged(void) {
   case USB_MIDI:
     MIDI_Device_ConfigureEndpoints(&USB_MIDI_Interface);
     break;
+  case USB_STORAGE:
+    MS_Device_ConfigureEndpoints(&Disk_MS_Interface);
+    break;
   }
 }
 
 /** Event handler for the library USB Control Request reception event. */
 void EVENT_USB_Device_ControlRequest(void) {
-  CDC_Device_ProcessControlRequest(&VirtualSerial_CDC_Interface);
+  switch (usb_mode) {
+  case USB_SERIAL:
+    CDC_Device_ProcessControlRequest(&VirtualSerial_CDC_Interface);
+    break;
+  case USB_MIDI:
+    MIDI_Device_ProcessControlRequest(&USB_MIDI_Interface);
+    break;
+  case USB_STORAGE:
+    MS_Device_ProcessControlRequest(&Disk_MS_Interface);
+    break;
+  }
 }
 
 /** Event handler for the CDC Class driver Line Encoding Changed event.
@@ -557,4 +603,13 @@ void EVENT_CDC_Device_ControLineStateChanged(
     AVR_RESET_LINE_PORT &= ~AVR_RESET_LINE_MASK;
   else
     AVR_RESET_LINE_PORT |= AVR_RESET_LINE_MASK;
+}
+
+bool CALLBACK_MS_Device_SCSICommandReceived(
+    USB_ClassInfo_MS_Device_t *const MSInterfaceInfo) {
+  bool CommandSuccess;
+
+  CommandSuccess = SCSI_DecodeSCSICommand(MSInterfaceInfo);
+
+  return CommandSuccess;
 }

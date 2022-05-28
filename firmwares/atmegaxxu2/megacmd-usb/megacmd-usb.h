@@ -55,12 +55,16 @@
 #include <LUFA/Drivers/USB/USB.h>
 
 #include <LUFA/Common/Common.h>
-#include <c_structs.h>
 
+extern "C" {
+#include "SCSI.h"
+}
+
+#include <c_structs.h>
 extern uint8_t usb_mode;
 
 /* Function Prototypes: */
-void SetupHardware(void);
+void SetupHardware(uint8_t state);
 void USB_Serial();
 void USB_Midi();
 
@@ -73,5 +77,7 @@ void EVENT_CDC_Device_LineEncodingChanged(
     USB_ClassInfo_CDC_Device_t *const CDCInterfaceInfo);
 void EVENT_CDC_Device_ControLineStateChanged(
     USB_ClassInfo_CDC_Device_t *const CDCInterfaceInfo);
+
+bool CALLBACK_MS_Device_SCSICommandReceived(USB_ClassInfo_MS_Device_t* const MSInterfaceInfo);
 
 #endif /* _ARDUINO_USBSERIAL_H_ */

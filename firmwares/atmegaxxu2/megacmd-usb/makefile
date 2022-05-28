@@ -72,6 +72,8 @@ LDFLAGS = $(OPTIM_FLAGS) $(WARN_FLAGS) -flto -fuse-linker-plugin -mrelax $(LINK_
 
 #DIRS = SdFat SdFat/SdCard SdFat/FatLib SdFat/SpiDriver SdFat/SpiDriver/boards SPI
 
+DIRS = SPI
+
 LDIRS = $(foreach dir,$(DIRS),$(CORE_DIR)/$(dir)) ${CORE_DIR} ${VARIENTS_DIR} ${HOME_DIR}/LUFA_210130
 
 $(info  LDIRS is $(LDIRS))

@@ -5,6 +5,7 @@
 
 #include <LUFA/Common/Common.h>
 #include <Descriptors.h>
+#include <SDCardManager.h>
 #include <c_structs.h>
 
 /** LUFA CDC Class driver interface configuration and state information. This 
@@ -60,3 +61,24 @@ USB_ClassInfo_CDC_Device_t VirtualSerial_CDC_Interface = {
                 }, 
         }, 
 };
+
+USB_ClassInfo_MS_Device_t Disk_MS_Interface =
+    {
+        .Config =
+            {
+                .InterfaceNumber           = INTERFACE_ID_MassStorage,
+                .DataINEndpoint            =
+                    {
+                        .Address           = MASS_STORAGE_IN_EPADDR,
+                        .Size              = MASS_STORAGE_IO_EPSIZE,
+                        .Banks             = 1,
+                    },
+                .DataOUTEndpoint           =
+                    {
+                        .Address           = MASS_STORAGE_OUT_EPADDR,
+                        .Size              = MASS_STORAGE_IO_EPSIZE,
+                        .Banks             = 1,
+                    },
+                .TotalLUNs                 = TOTAL_LUNS,
+            },
+    };
