@@ -77,7 +77,54 @@ void Jump_To_Bootloader(void) {
   for (;;)
     ;
 }
-bool is_init = false;
+
+/** Configures the board hardware and chip peripherals for the demo's
+ * functionality. */
+void SetupHardware(uint8_t state) {
+  /* Disable watchdog if enabled by bootloader/fuses */
+  MCUSR &= ~(1 << WDRF);
+  wdt_disable();
+  clock_prescale_set(clock_div_1);
+
+  /* Hardware Initialization */
+  switch (state) {
+  case USB_SERIAL: {
+    Serial_Init(9600, false);
+    break;
+  }
+  case USB_MIDI: {
+    uint32_t speed = 250000;
+    uint32_t cpu = (F_CPU / 16);
+    cpu /= speed;
+    cpu--;
+
+    UBRR1H = ((cpu >> 8) & 0xFF);
+    UBRR1L = (cpu & 0xFF);
+
+    UCSR1B = ((1 << RXCIE1) | (1 << TXEN1) | (1 << RXEN1));
+    break;
+  }
+  case USB_STORAGE: {
+    uint8_t count = 4;
+    while (!SDCardManager_Init(8));
+    break;
+  }
+  }
+  usb_mode = state;
+
+  USB_Init();
+
+  /* Start the flush timer so that overflows occur rapidly to push received
+   * bytes to the USB interface */
+  TCCR0B = (1 << CS02);
+
+  /* Pull target /RESET line high */
+  if (usb_mode == USB_SERIAL) {
+    AVR_RESET_LINE_PORT |= AVR_RESET_LINE_MASK;
+    AVR_RESET_LINE_DDR |= AVR_RESET_LINE_MASK;
+  }
+}
+
 int main(void) {
 
   uint8_t state = USB_SERIAL;
@@ -135,15 +182,7 @@ INIT:
       switch (usb_mode) {
       case USB_SERIAL:
         USB_Serial();
-      /*  if (!is_init) {
-          if (SDCardManager_Init(8)) {
-            CDC_Device_SendByte(&VirtualSerial_CDC_Interface, 'Y');
-            is_init = true;
-          } else {
-            CDC_Device_SendByte(&VirtualSerial_CDC_Interface, 'N');
-          }
-        }*/
-        break;
+       break;
       case USB_MIDI:
         USB_Midi();
         break;
@@ -435,53 +474,6 @@ void USB_Midi() {
    * This should be called frequently in the main program loop, before the
    * master USB management task USB_USBTask(). */
   MIDI_Device_USBTask(&USB_MIDI_Interface);
-}
-
-/** Configures the board hardware and chip peripherals for the demo's
- * functionality. */
-void SetupHardware(uint8_t state) {
-  /* Disable watchdog if enabled by bootloader/fuses */
-  MCUSR &= ~(1 << WDRF);
-  wdt_disable();
-  clock_prescale_set(clock_div_1);
-
-  /* Hardware Initialization */
-  switch (state) {
-  case USB_SERIAL: {
-    Serial_Init(9600, false);
-    break;
-  }
-  case USB_MIDI: {
-    uint32_t speed = 250000;
-    uint32_t cpu = (F_CPU / 16);
-    cpu /= speed;
-    cpu--;
-
-    UBRR1H = ((cpu >> 8) & 0xFF);
-    UBRR1L = (cpu & 0xFF);
-
-    UCSR1B = ((1 << RXCIE1) | (1 << TXEN1) | (1 << RXEN1));
-    break;
-  }
-  case USB_STORAGE: {
-    uint8_t count = 4;
-    while (!SDCardManager_Init(8));
-    break;
-  }
-  }
-  usb_mode = state;
-
-  USB_Init();
-
-  /* Start the flush timer so that overflows occur rapidly to push received
-   * bytes to the USB interface */
-  TCCR0B = (1 << CS02);
-
-  /* Pull target /RESET line high */
-  if (usb_mode == USB_SERIAL) {
-    AVR_RESET_LINE_PORT |= AVR_RESET_LINE_MASK;
-    AVR_RESET_LINE_DDR |= AVR_RESET_LINE_MASK;
-  }
 }
 
 /** Event handler for the library USB Configuration Changed event. */
