@@ -61,6 +61,7 @@ extern "C" {
 }
 
 #include <c_structs.h>
+extern uint8_t global_buffer[512];
 extern uint8_t usb_mode;
 
 /* Function Prototypes: */

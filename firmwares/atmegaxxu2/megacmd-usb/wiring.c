@@ -61,7 +61,6 @@ volatile unsigned long timer0_millis = 0;
 
 ISR(TIMER1_COMPA_vect) {
     timer0_millis++;
-    return;
 }
 
 

@@ -1,14 +1,11 @@
 #include "SDCardDriver.h"
-
+#include "SdInfo.h"
 
 #ifdef SDCARD_DRIVER_DEBUG
 #define error(ERROR_CODE) Serial1.println(#ERROR_CODE);
 #else
 #define error(ERROR_CODE)
 #endif
-
-uint8_t s_sd_raw_block[512];
-static uint32_t s_sd_raw_block_address;
 
 SDCardDriver::SDCardDriver()
   //: m_spi_settings(250000, MSBFIRST, SPI_MODE0)
@@ -95,6 +92,13 @@ fail:
   chipSelectHigh();
   return false;
 }
+
+/*
+uint32_t SDCardDriver::readCapacity() {
+  csd_t csd;
+  return readCSD(&csd) ? sdCardCapacity(&csd) : 0;
+}
+*/
 
 uint32_t SDCardDriver::readCapacity()
 {

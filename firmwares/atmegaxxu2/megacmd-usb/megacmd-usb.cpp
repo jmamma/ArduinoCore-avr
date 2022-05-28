@@ -34,11 +34,11 @@
 #include <util/delay.h>
 /** Circular buffer to hold data from the host before it is sent to the device
  * via the serial port. */
-RingBuff_t USBtoUSART_Buffer;
+RingBuff_t *USBtoUSART_Buffer;
 
 /** Circular buffer to hold data from the serial port before it is sent to the
  * host. */
-RingBuff_t USARTtoUSB_Buffer;
+RingBuff_t *USARTtoUSB_Buffer;
 
 uint32_t Boot_Key ATTR_NO_INIT;
 #define MAGIC_BOOT_KEY 0xDC42ACCA
@@ -49,6 +49,8 @@ uint32_t Boot_Key ATTR_NO_INIT;
 
 #define UART_SET_ISR_TX_BIT() SET_BIT(UCSR1B, UDRIE1);
 #define UART_CLEAR_ISR_TX_BIT() CLEAR_BIT(UCSR1B, UDRIE1);
+
+uint8_t global_buffer[512];
 
 void Bootloader_Jump_Check(void) ATTR_INIT_SECTION(3);
 void Bootloader_Jump_Check(void) {
@@ -105,8 +107,8 @@ void SetupHardware(uint8_t state) {
     break;
   }
   case USB_STORAGE: {
-    uint8_t count = 4;
-    while (!SDCardManager_Init(8));
+    while (!SDCardManager_Init(8))
+      ;
     break;
   }
   }
@@ -126,6 +128,9 @@ void SetupHardware(uint8_t state) {
 }
 
 int main(void) {
+
+  USBtoUSART_Buffer = (RingBuff_t *)global_buffer;
+  USARTtoUSB_Buffer = (RingBuff_t *)(global_buffer + sizeof(RingBuff_t));
 
   uint8_t state = USB_SERIAL;
 
@@ -155,8 +160,8 @@ int main(void) {
 INIT:
   SetupHardware(state);
 
-  RingBuffer_InitBuffer(&USBtoUSART_Buffer);
-  RingBuffer_InitBuffer(&USARTtoUSB_Buffer);
+  RingBuffer_InitBuffer(USBtoUSART_Buffer);
+  RingBuffer_InitBuffer(USARTtoUSB_Buffer);
   sei();
 
   // wait for MegaCMD to boot
@@ -167,14 +172,16 @@ INIT:
     bool a = PINC & (1 << PC5);
     bool b = PINC & (1 << PC4);
     state = (uint8_t)a * 2 + (uint8_t)b;
-    if (state == USB_DFU) {
-      Jump_To_Bootloader();
-    }
+
     if (state != usb_mode) {
-      USB_Detach();
-      USB_Disable();
+      if (state == USB_DFU) {
+        Jump_To_Bootloader();
+      }
+      // USB_Detach();
       cli();
-      for (uint8_t i = 0; i < 32; i++)
+      USB_Disable();
+      Serial_Disable();
+      for (uint8_t i = 0; i < 128; i++)
         _delay_ms(16);
       goto INIT;
     }
@@ -182,7 +189,7 @@ INIT:
       switch (usb_mode) {
       case USB_SERIAL:
         USB_Serial();
-       break;
+        break;
       case USB_MIDI:
         USB_Midi();
         break;
@@ -200,13 +207,13 @@ void USB_Serial() {
   /* Only try to read in bytes from the CDC interface if the transmit buffer
    * is not full */
 
-  if (!(RingBuffer_IsFull(&USBtoUSART_Buffer))) {
+  if (!(RingBuffer_IsFull(USBtoUSART_Buffer))) {
     int16_t ReceivedByte = CDC_Device_ReceiveByte(&VirtualSerial_CDC_Interface);
 
     /* Read bytes from the USB OUT endpoint into the USART transmit buffer
      */
     if (!(ReceivedByte < 0))
-      RingBuffer_Insert(&USBtoUSART_Buffer, ReceivedByte);
+      RingBuffer_Insert(USBtoUSART_Buffer, ReceivedByte);
     UART_SET_ISR_TX_BIT();
   }
   // if (USB_DeviceState == DEVICE_STATE_Configured) {
@@ -216,14 +223,14 @@ void USB_Serial() {
   /* Check if the UART receive buffer flush timer has expired or the buffer
    * is nearly full */
   // 40ms ??
-  RingBuff_Count_t BufferCount = RingBuffer_GetCount(&USARTtoUSB_Buffer);
+  RingBuff_Count_t BufferCount = RingBuffer_GetCount(USARTtoUSB_Buffer);
   if ((TIFR0 & (1 << TOV0)) || (BufferCount > BUFFER_NEARLY_FULL)) {
     TIFR0 |= (1 << TOV0);
 
     /* Read bytes from the USART receive buffer into the USB IN endpoint */
     while (BufferCount--)
       CDC_Device_SendByte(&VirtualSerial_CDC_Interface,
-                          RingBuffer_Remove(&USARTtoUSB_Buffer));
+                          RingBuffer_Remove(USARTtoUSB_Buffer));
   }
 
   /* Load the next byte from the USART transmit buffer into the USART */
@@ -319,18 +326,18 @@ void USB_Midi() {
 
     ptr++;
     for (uint8_t n = 0; n < len; n++) {
-      RingBuffer_Insert(&USBtoUSART_Buffer, ptr[n]);
+      RingBuffer_Insert(USBtoUSART_Buffer, ptr[n]);
     }
     UART_SET_ISR_TX_BIT();
   }
 
-  RingBuff_Count_t BufferCount = RingBuffer_GetCount(&USARTtoUSB_Buffer);
+  RingBuff_Count_t BufferCount = RingBuffer_GetCount(USARTtoUSB_Buffer);
   if ((TIFR0 & (1 << TOV0)) || (BufferCount > BUFFER_NEARLY_FULL)) {
     TIFR0 |= (1 << TOV0);
 
     uint8_t *ptr = ((uint8_t *)&SendMIDIEvent);
     while (BufferCount--) {
-      uint8_t c = RingBuffer_Remove(&USARTtoUSB_Buffer);
+      uint8_t c = RingBuffer_Remove(USARTtoUSB_Buffer);
       bool send = false;
       // STATUS BYTES
       if (MIDI_IS_STATUS_BYTE(c)) {
@@ -567,14 +574,14 @@ void EVENT_CDC_Device_LineEncodingChanged(
 ISR(USART1_RX_vect, ISR_BLOCK) {
   uint8_t ReceivedByte = UDR1;
   if (USB_DeviceState == DEVICE_STATE_Configured)
-    RingBuffer_Insert(&USARTtoUSB_Buffer, ReceivedByte);
+    RingBuffer_Insert(USARTtoUSB_Buffer, ReceivedByte);
 }
 
 ISR(USART1_UDRE_vect) {
-  if (!(RingBuffer_IsEmpty(&USBtoUSART_Buffer))) {
-    UDR1 = RingBuffer_Remove(&USBtoUSART_Buffer);
+  if (!(RingBuffer_IsEmpty(USBtoUSART_Buffer))) {
+    UDR1 = RingBuffer_Remove(USBtoUSART_Buffer);
   }
-  if ((RingBuffer_IsEmpty(&USBtoUSART_Buffer))) {
+  if ((RingBuffer_IsEmpty(USBtoUSART_Buffer))) {
     UART_CLEAR_ISR_TX_BIT();
   }
 }

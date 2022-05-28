@@ -14,6 +14,9 @@
 #ifndef _SPI_H_INCLUDED
 #define _SPI_H_INCLUDED
 
+
+#define OPTIMIZE_SDCARD_HARDWARE_SPI
+
 #include <Arduino.h>
 
 // SPI_HAS_TRANSACTION means SPI has beginTransaction(), endTransaction(),

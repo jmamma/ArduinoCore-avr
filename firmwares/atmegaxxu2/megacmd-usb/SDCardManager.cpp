@@ -1,11 +1,10 @@
 #include "SDCardManager.h"
 
 #include "Arduino.h"
-
+#include "megacmd-usb.h"
 SDCardDriver s_sdcard_driver;
 
 static uint32_t s_cached_total_blocks = 0;
-extern uint8_t s_sd_raw_block[512];
 
 bool SDCardManager_Init(uint8_t chipSelectPin)
 {
@@ -53,7 +52,7 @@ void SDCardManager_WriteBlocks(USB_ClassInfo_MS_Device_t *const MSInterfaceInfo,
     return;
 
   while (TotalBlocks) {
-    uint8_t *buffer = s_sd_raw_block;
+    uint8_t *buffer = global_buffer;
     for (uint16_t offset = 0; offset < VIRTUAL_MEMORY_BLOCK_SIZE; offset += MASS_STORAGE_IO_EPSIZE) {
       if (!Endpoint_IsReadWriteAllowed()) {
         Endpoint_ClearOUT();
@@ -68,7 +67,7 @@ void SDCardManager_WriteBlocks(USB_ClassInfo_MS_Device_t *const MSInterfaceInfo,
       if (MSInterfaceInfo->State.IsMassStoreReset)
         return;
     }
-    if (!s_sdcard_driver.writeBlock(BlockAddress * VIRTUAL_MEMORY_BLOCK_SIZE, s_sd_raw_block))
+    if (!s_sdcard_driver.writeBlock(BlockAddress * VIRTUAL_MEMORY_BLOCK_SIZE, global_buffer))
       break;
 
     /* Decrement the blocks remaining counter */
@@ -107,9 +106,9 @@ void SDCardManager_ReadBlocks(USB_ClassInfo_MS_Device_t *const MSInterfaceInfo,
     return;
 
   while (TotalBlocks) {
-    if (!s_sdcard_driver.readBlock(BlockAddress * VIRTUAL_MEMORY_BLOCK_SIZE, s_sd_raw_block))
+    if (!s_sdcard_driver.readBlock(BlockAddress * VIRTUAL_MEMORY_BLOCK_SIZE, global_buffer))
       break;
-    uint8_t *buffer = s_sd_raw_block;
+    uint8_t *buffer = global_buffer;
     for (uint16_t offset = 0; offset < VIRTUAL_MEMORY_BLOCK_SIZE; offset += MASS_STORAGE_IO_EPSIZE) {
       if (!Endpoint_IsReadWriteAllowed())  {
         Endpoint_ClearIN();
