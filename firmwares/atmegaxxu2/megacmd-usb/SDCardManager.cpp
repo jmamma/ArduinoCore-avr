@@ -2,17 +2,25 @@
 
 #include "Arduino.h"
 #include "megacmd-usb.h"
-SDCardDriver s_sdcard_driver;
+
+//#include "SdFat/SdFat.h"
+//#include "SdFat/SdCard/SdSpiCard.h"
+//#include "SdFat/SdCard/SpiDriver/SpiDriver.h"
+//#include "SPI/SPI.h"
+
+SdSpiCard sd_spi_card;
+SdSpiDriver sd_spi_driver;
 
 static uint32_t s_cached_total_blocks = 0;
 
 bool SDCardManager_Init(uint8_t chipSelectPin)
 {
-  s_sdcard_driver = SDCardDriver();
-  if (!s_sdcard_driver.init(chipSelectPin))
+
+  SPISettings m_spi_settings(F_CPU, MSBFIRST, SPI_MODE0);
+  if (!sd_spi_card.begin(&sd_spi_driver, chipSelectPin, m_spi_settings))
     return false;
   //delay(100);
-  s_cached_total_blocks = s_sdcard_driver.readCapacity() / VIRTUAL_MEMORY_BLOCK_SIZE;
+  s_cached_total_blocks = sd_spi_card.cardSize();
   return (s_cached_total_blocks > 0);
 }
 
@@ -67,7 +75,7 @@ void SDCardManager_WriteBlocks(USB_ClassInfo_MS_Device_t *const MSInterfaceInfo,
       if (MSInterfaceInfo->State.IsMassStoreReset)
         return;
     }
-    if (!s_sdcard_driver.writeBlock(BlockAddress * VIRTUAL_MEMORY_BLOCK_SIZE, global_buffer))
+    if (!sd_spi_card.writeBlock(BlockAddress * VIRTUAL_MEMORY_BLOCK_SIZE, global_buffer))
       break;
 
     /* Decrement the blocks remaining counter */
@@ -106,7 +114,7 @@ void SDCardManager_ReadBlocks(USB_ClassInfo_MS_Device_t *const MSInterfaceInfo,
     return;
 
   while (TotalBlocks) {
-    if (!s_sdcard_driver.readBlock(BlockAddress * VIRTUAL_MEMORY_BLOCK_SIZE, global_buffer))
+    if (!sd_spi_card.readBlock(BlockAddress * VIRTUAL_MEMORY_BLOCK_SIZE, global_buffer))
       break;
     uint8_t *buffer = global_buffer;
     for (uint16_t offset = 0; offset < VIRTUAL_MEMORY_BLOCK_SIZE; offset += MASS_STORAGE_IO_EPSIZE) {

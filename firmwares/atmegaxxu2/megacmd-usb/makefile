@@ -70,9 +70,9 @@ CXXFLAGS     += -fpermissive -fno-exceptions -fno-threadsafe-statics -fno-rtti
 
 LDFLAGS = $(OPTIM_FLAGS) $(WARN_FLAGS) -flto -fuse-linker-plugin -mrelax $(LINK_FLAGS) $(ARCH_FLAGS)
 
-#DIRS = SdFat SdFat/SdCard SdFat/FatLib SdFat/SpiDriver SdFat/SpiDriver/boards SPI
+DIRS = SdFat SdFat/SdCard SdFat/FatLib SdFat/SpiDriver SdFat/SdCard SPI
 
-DIRS = SPI
+#DIRS = SPI
 
 LDIRS = $(foreach dir,$(DIRS),$(CORE_DIR)/$(dir)) ${CORE_DIR} ${VARIENTS_DIR} ${HOME_DIR}/LUFA_210130
 
