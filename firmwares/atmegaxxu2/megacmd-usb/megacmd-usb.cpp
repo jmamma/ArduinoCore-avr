@@ -177,7 +177,7 @@ INIT:
       if (state == USB_DFU) {
         Jump_To_Bootloader();
       }
-      // USB_Detach();
+      //USB_Detach();
       cli();
       USB_Disable();
       Serial_Disable();

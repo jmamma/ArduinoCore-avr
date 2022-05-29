@@ -398,7 +398,6 @@ const USB_MIDI_Descriptor_Configuration_t PROGMEM USB_MIDI_ConfigurationDescript
 		}
 };
 
-
 const USB_Storage_Descriptor_Configuration_t PROGMEM USB_Storage_ConfigurationDescriptor =
 {
 	.Config =
@@ -453,7 +452,6 @@ const USB_Storage_Descriptor_Configuration_t PROGMEM USB_Storage_ConfigurationDe
 		}
 };
 
-
 /** This function is called by the library when in device mode, and must be overridden (see library "USB Descriptors"
  *  documentation) by the application code so that the address and size of a requested descriptor can be given
  *  to the USB library. When the device receives a Get Descriptor request on the control endpoint, this function
@@ -484,11 +482,11 @@ uint16_t CALLBACK_USB_GetDescriptor(const uint16_t wValue,
               break;
               case USB_MIDI:
               Address = &USB_MIDI_ConfigurationDescriptor;
-			  Size    = sizeof(USB_MIDI_Descriptor_Configuration_t);
+			  Size    = sizeof(USB_Descriptor_Configuration_t);
               break;
               case USB_STORAGE:
               Address = &USB_Storage_ConfigurationDescriptor;
-			  Size    = sizeof(USB_Storage_Descriptor_Configuration_t);
+			  Size    = sizeof(USB_Descriptor_Configuration_t);
               break;
             }
             break;
