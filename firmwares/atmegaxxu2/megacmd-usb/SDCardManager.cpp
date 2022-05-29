@@ -9,7 +9,7 @@
 //#include "SPI/SPI.h"
 
 SdSpiCard sd_spi_card;
-SdSpiDriver sd_spi_driver;
+SdSpiAltDriver sd_spi_driver;
 
 static uint32_t s_cached_total_blocks = 0;
 
@@ -75,7 +75,7 @@ void SDCardManager_WriteBlocks(USB_ClassInfo_MS_Device_t *const MSInterfaceInfo,
       if (MSInterfaceInfo->State.IsMassStoreReset)
         return;
     }
-    if (!sd_spi_card.writeBlock(BlockAddress * VIRTUAL_MEMORY_BLOCK_SIZE, global_buffer))
+    if (!sd_spi_card.writeBlock(BlockAddress, global_buffer))
       break;
 
     /* Decrement the blocks remaining counter */
@@ -114,7 +114,7 @@ void SDCardManager_ReadBlocks(USB_ClassInfo_MS_Device_t *const MSInterfaceInfo,
     return;
 
   while (TotalBlocks) {
-    if (!sd_spi_card.readBlock(BlockAddress * VIRTUAL_MEMORY_BLOCK_SIZE, global_buffer))
+    if (!sd_spi_card.readBlock(BlockAddress, global_buffer))
       break;
     uint8_t *buffer = global_buffer;
     for (uint16_t offset = 0; offset < VIRTUAL_MEMORY_BLOCK_SIZE; offset += MASS_STORAGE_IO_EPSIZE) {
