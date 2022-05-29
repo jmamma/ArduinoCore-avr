@@ -93,13 +93,13 @@ fail:
   return false;
 }
 
-/*
+
 uint32_t SDCardDriver::readCapacity() {
   csd_t csd;
   return readCSD(&csd) ? sdCardCapacity(&csd) : 0;
 }
-*/
 
+/*
 uint32_t SDCardDriver::readCapacity()
 {
   uint32_t capacity = 0;
@@ -171,7 +171,7 @@ fail:
   chipSelectHigh();
   return 0;
 }
-
+*/
 bool SDCardDriver::readBlock(uint32_t block, uint8_t* buffer)
 {
   uint16_t block_offset = block & 0x01ff;
@@ -251,44 +251,6 @@ fail:
   chipSelectHigh();
   return false; 
 }
-
-void SDCardDriver::printBlock(uint32_t block)
-{    
-  if (m_type != SD_CARD_TYPE_SDHC)
-    block <<= 9;
-  
-  if (cardCommand(CMD17, block)) {
-    error(SD_CARD_ERROR_CMD17);
-    goto fail;
-  }
-  while (SPI.transfer(0xFF) != 0xfe);
-
-  Serial1.print("Block: ");
-  Serial1.println(block);
-  
-  for (uint16_t i = 0; i < 512; ++i) {
-    uint8_t b = SPI.transfer(0xff);
-    if (b < 0x10)
-      Serial1.write('0');
-    Serial1.print(b, HEX);
-    if ((i > 0) && (i + 1) % 32 == 0)
-      Serial1.println();
-    else
-      Serial1.write(' ');
-  }
-  Serial1.println();
-
-  // read crc16
-  SPI.transfer16(0xffff);
-
-  chipSelectHigh();
-  return true;
-
-fail:
-  chipSelectHigh();
-  return false;
-}
-
 SDCardDriver::SDCardType SDCardDriver::type() const
 {
   return static_cast<SDCardType>(m_type);

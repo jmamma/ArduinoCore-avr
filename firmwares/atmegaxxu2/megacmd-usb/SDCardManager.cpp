@@ -12,7 +12,9 @@ bool SDCardManager_Init(uint8_t chipSelectPin)
   if (!s_sdcard_driver.init(chipSelectPin))
     return false;
   //delay(100);
-  s_cached_total_blocks = s_sdcard_driver.readCapacity() / VIRTUAL_MEMORY_BLOCK_SIZE;
+  //s_cached_total_blocks = s_sdcard_driver.readCapacity() / VIRTUAL_MEMORY_BLOCK_SIZE;
+
+  s_cached_total_blocks = s_sdcard_driver.readCapacity();
   return (s_cached_total_blocks > 0);
 }
 
