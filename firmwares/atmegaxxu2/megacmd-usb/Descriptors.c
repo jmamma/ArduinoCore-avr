@@ -404,7 +404,7 @@ const USB_Storage_Descriptor_Configuration_t PROGMEM USB_Storage_ConfigurationDe
 		{
 			.Header                 = {.Size = sizeof(USB_Descriptor_Configuration_Header_t), .Type = DTYPE_Configuration},
 
-			.TotalConfigurationSize = sizeof(USB_Descriptor_Configuration_t),
+			.TotalConfigurationSize = sizeof(USB_Storage_Descriptor_Configuration_t),
 			.TotalInterfaces        = 1,
 
 			.ConfigurationNumber    = 1,
@@ -482,11 +482,11 @@ uint16_t CALLBACK_USB_GetDescriptor(const uint16_t wValue,
               break;
               case USB_MIDI:
               Address = &USB_MIDI_ConfigurationDescriptor;
-			  Size    = sizeof(USB_Descriptor_Configuration_t);
+			  Size    = sizeof(USB_MIDI_Descriptor_Configuration_t);
               break;
               case USB_STORAGE:
               Address = &USB_Storage_ConfigurationDescriptor;
-			  Size    = sizeof(USB_Descriptor_Configuration_t);
+			  Size    = sizeof(USB_Storage_Descriptor_Configuration_t);
               break;
             }
             break;
