@@ -65,8 +65,8 @@ static const SCSI_Inquiry_Response_t InquiryData =
 		.WideBus32Bit        = false,
 		.RelAddr             = false,
 
-		.VendorID            = "LUFA",
-		.ProductID           = "Dataflash Disk",
+		.VendorID            = "MegaCMD",
+		.ProductID           = "SD Card",
 		.RevisionID          = {'0','.','0','0'},
 	};
 
