@@ -63,8 +63,8 @@
         #define CDC_TXRX_EPSIZE                64
 
         #define USB_SERIAL  3
-        #define USB_MIDI    1
-        #define USB_STORAGE 2
+        #define USB_MIDI    2
+        #define USB_STORAGE 1
         #define USB_DFU     0
 
         /* Type Defines: */

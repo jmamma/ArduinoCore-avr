@@ -127,6 +127,26 @@ void SetupHardware(uint8_t state) {
   }
 }
 
+void initState(uint8_t state) {
+  SetupHardware(state);
+
+  RingBuffer_InitBuffer(USBtoUSART_Buffer);
+  RingBuffer_InitBuffer(USARTtoUSB_Buffer);
+  sei();
+}
+
+void switchState(uint8_t state) {
+  if (state == USB_DFU) {
+    Jump_To_Bootloader();
+  }
+  // USB_Detach();
+  cli();
+  USB_Disable();
+  Serial_Disable();
+  for (uint8_t i = 0; i < 128; i++)
+    _delay_ms(16);
+}
+
 int main(void) {
 
   USBtoUSART_Buffer = (RingBuff_t *)global_buffer;
@@ -158,11 +178,7 @@ int main(void) {
   PORTC |= (1 << PC4) | (1 << PC5);
 
 INIT:
-  SetupHardware(state);
-
-  RingBuffer_InitBuffer(USBtoUSART_Buffer);
-  RingBuffer_InitBuffer(USARTtoUSB_Buffer);
-  sei();
+  initState(state);
 
   // wait for MegaCMD to boot
   for (uint8_t i = 0; i < 128; i++)
@@ -172,17 +188,8 @@ INIT:
     bool a = PINC & (1 << PC5);
     bool b = PINC & (1 << PC4);
     state = (uint8_t)a * 2 + (uint8_t)b;
-
     if (state != usb_mode) {
-      if (state == USB_DFU) {
-        Jump_To_Bootloader();
-      }
-      //USB_Detach();
-      cli();
-      USB_Disable();
-      Serial_Disable();
-      for (uint8_t i = 0; i < 128; i++)
-        _delay_ms(16);
+      switchState(state);
       goto INIT;
     }
     if (USB_DeviceState == DEVICE_STATE_Configured) {
@@ -284,6 +291,39 @@ bool in_sysex = 0;
 bool special_case = false;
 MIDI_EventPacket_t SendMIDIEvent;
 
+uint8_t change_mode_msg[] = {0xF0, 0x7D, 0x01, 0x00, 0xF7};
+
+class MessageCheck {
+
+  public:
+  MessageCheck(uint8_t * msg_, uint8_t len_) {
+    msg = msg_;
+    len = len_;
+  }
+  uint8_t *msg;
+  uint8_t count = 0;
+  uint8_t last = 0;
+  uint8_t len = 0;
+
+  bool check(uint8_t byte) {
+    if (byte == msg[count++]) {
+      count++;
+      if (count == len) {
+        switchState(last);
+        count = 0;
+        return true;
+      }
+    } else {
+      count = 0;
+    }
+    last = byte;
+    return false;
+  }
+};
+
+MessageCheck msg_usb(change_mode_msg, sizeof(change_mode_msg));
+MessageCheck msg_uart(change_mode_msg, sizeof(change_mode_msg));
+
 void USB_Midi() {
 
   MIDI_EventPacket_t ReceivedMIDIEvent;
@@ -326,6 +366,9 @@ void USB_Midi() {
 
     ptr++;
     for (uint8_t n = 0; n < len; n++) {
+      if (msg_usb.check(ptr[n])) {
+        return;
+      }
       RingBuffer_Insert(USBtoUSART_Buffer, ptr[n]);
     }
     UART_SET_ISR_TX_BIT();
@@ -403,11 +446,12 @@ void USB_Midi() {
           case MIDI_SYSEX_END:
             if (!in_sysex)
               break; // error
-            printf("end %d\n", data_cnt);
+            if (msg_uart.check(c)) {
+              return;
+            }
             in_sysex = 0;
             send = true;
             if (special_case) {
-              printf("special");
               if (data_cnt == 1) {
                 ptr[0] = 0x6;
                 ptr[1] = 0xF0;
@@ -461,6 +505,7 @@ void USB_Midi() {
       }
       // Data
       if (in_sysex) {
+        msg_uart.check(c);
         ptr[1 + data_cnt] = c;
         data_cnt++;
         if (data_cnt == 3) {
