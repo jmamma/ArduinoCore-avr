@@ -32,13 +32,18 @@
 #include "SDCardManager.h"
 #include "megacmd-usb.h"
 #include <util/delay.h>
+
+/** Dual use buffer for MIDI and SDCard **/
+uint8_t global_buffer[512];
+
 /** Circular buffer to hold data from the host before it is sent to the device
  * via the serial port. */
-RingBuff_t *USBtoUSART_Buffer;
+RingBuff_t *USBtoUSART_Buffer = (RingBuff_t *)global_buffer;
 
 /** Circular buffer to hold data from the serial port before it is sent to the
  * host. */
-RingBuff_t *USARTtoUSB_Buffer;
+RingBuff_t *USARTtoUSB_Buffer =
+    (RingBuff_t *)(global_buffer + sizeof(RingBuff_t));
 
 uint32_t Boot_Key ATTR_NO_INIT;
 #define MAGIC_BOOT_KEY 0xDC42ACCA
@@ -49,8 +54,6 @@ uint32_t Boot_Key ATTR_NO_INIT;
 
 #define UART_SET_ISR_TX_BIT() SET_BIT(UCSR1B, UDRIE1);
 #define UART_CLEAR_ISR_TX_BIT() CLEAR_BIT(UCSR1B, UDRIE1);
-
-uint8_t global_buffer[512];
 
 void Bootloader_Jump_Check(void) ATTR_INIT_SECTION(3);
 void Bootloader_Jump_Check(void) {
@@ -90,28 +93,20 @@ void SetupHardware(uint8_t state) {
 
   /* Hardware Initialization */
   switch (state) {
-  case USB_SERIAL: {
+  case USB_SERIAL:
     Serial_Init(9600, false);
-    break;
-  }
-  case USB_MIDI: {
-    uint32_t speed = 250000;
-    uint32_t cpu = (F_CPU / 16);
-    cpu /= speed;
-    cpu--;
-
-    UBRR1H = ((cpu >> 8) & 0xFF);
-    UBRR1L = (cpu & 0xFF);
-
     UCSR1B = ((1 << RXCIE1) | (1 << TXEN1) | (1 << RXEN1));
     break;
-  }
-  case USB_STORAGE: {
+  case USB_MIDI:
+    Serial_Init(250000, false);
+    UCSR1B = ((1 << RXCIE1) | (1 << TXEN1) | (1 << RXEN1));
+    break;
+  case USB_STORAGE:
     while (!SDCardManager_Init(8))
       ;
     break;
   }
-  }
+
   usb_mode = state;
 
   USB_Init();
@@ -133,24 +128,26 @@ void initState(uint8_t state) {
   RingBuffer_InitBuffer(USBtoUSART_Buffer);
   RingBuffer_InitBuffer(USARTtoUSB_Buffer);
   sei();
+  // wait for MegaCMD to boot
+  for (uint8_t i = 0; i < 128; i++)
+    _delay_ms(16);
 }
 
 void switchState(uint8_t state) {
   if (state == USB_DFU) {
     Jump_To_Bootloader();
   }
-  // USB_Detach();
+  Serial_Disable();
+  USB_Detach();
   cli();
   USB_Disable();
-  Serial_Disable();
+  // Serial_Disable();
   for (uint8_t i = 0; i < 128; i++)
     _delay_ms(16);
+  initState(state);
 }
 
 int main(void) {
-
-  USBtoUSART_Buffer = (RingBuff_t *)global_buffer;
-  USARTtoUSB_Buffer = (RingBuff_t *)(global_buffer + sizeof(RingBuff_t));
 
   uint8_t state = USB_SERIAL;
 
@@ -180,17 +177,12 @@ int main(void) {
 INIT:
   initState(state);
 
-  // wait for MegaCMD to boot
-  for (uint8_t i = 0; i < 128; i++)
-    _delay_ms(16);
-
   for (;;) {
     bool a = PINC & (1 << PC5);
     bool b = PINC & (1 << PC4);
     state = (uint8_t)a * 2 + (uint8_t)b;
     if (state != usb_mode) {
       switchState(state);
-      goto INIT;
     }
     if (USB_DeviceState == DEVICE_STATE_Configured) {
       switch (usb_mode) {
@@ -295,8 +287,8 @@ uint8_t change_mode_msg[] = {0xF0, 0x7D, 0x01, 0x00, 0xF7};
 
 class MessageCheck {
 
-  public:
-  MessageCheck(uint8_t * msg_, uint8_t len_) {
+public:
+  MessageCheck(uint8_t *msg_, uint8_t len_) {
     msg = msg_;
     len = len_;
   }
@@ -337,8 +329,9 @@ void USB_Midi() {
     uint8_t len = 0;
 
     switch (cin) {
-    default:
+    default: {
       continue;
+    }
     case 0x5:
     case 0xF: {
       len = 1;
@@ -371,7 +364,10 @@ void USB_Midi() {
       }
       RingBuffer_Insert(USBtoUSART_Buffer, ptr[n]);
     }
-    UART_SET_ISR_TX_BIT();
+
+    if (len) {
+      UART_SET_ISR_TX_BIT();
+    }
   }
 
   RingBuff_Count_t BufferCount = RingBuffer_GetCount(USARTtoUSB_Buffer);
