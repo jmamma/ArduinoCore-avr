@@ -284,7 +284,7 @@ bool special_case = false;
 MIDI_EventPacket_t SendMIDIEvent;
 
 
-uint8_t change_mode_msg[] = {0xF0, 0x7D, 0x01, 0xFF, 0xF7};
+uint8_t change_mode_msg[] = {0xF0, 0x7D, 0x4D, 0x43, 0x4C, 0x01, mode, 0xF7};;
 
 class MessageCheck {
 
@@ -300,10 +300,10 @@ public:
 
   bool check(uint8_t byte) {
     if (msg[count] == 0xFF || byte == msg[count]) {
-      if (msg[count] = 0xFF) { state = byte; }
+      if (msg[count] == 0xFF) { state = byte; }
       count++;
       if (count == len) {
-        switchState(state);
+        if (state <= 3) { switchState(state); }
         count = 0;
         return true;
       }
