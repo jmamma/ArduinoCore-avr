@@ -149,7 +149,7 @@ void switchState(uint8_t state) {
 
 int main(void) {
 
-  uint8_t state = USB_SERIAL;
+  uint8_t state = USB_MIDI;
 
   TCCR1B = 0;
   TCCR1C = 0;
@@ -181,7 +181,7 @@ INIT:
     bool a = PINC & (1 << PC5);
     bool b = PINC & (1 << PC4);
     state = (uint8_t)a * 2 + (uint8_t)b;
-    if (state != usb_mode) {
+    if (state == USB_DFU) {
       switchState(state);
     }
     if (USB_DeviceState == DEVICE_STATE_Configured) {
@@ -283,7 +283,8 @@ bool in_sysex = 0;
 bool special_case = false;
 MIDI_EventPacket_t SendMIDIEvent;
 
-uint8_t change_mode_msg[] = {0xF0, 0x7D, 0x01, 0x00, 0xF7};
+
+uint8_t change_mode_msg[] = {0xF0, 0x7D, 0x01, 0xFF, 0xF7};
 
 class MessageCheck {
 
@@ -294,21 +295,21 @@ public:
   }
   uint8_t *msg;
   uint8_t count = 0;
-  uint8_t last = 0;
-  uint8_t len = 0;
+  uint8_t state = 0;
+  uint8_t len;
 
   bool check(uint8_t byte) {
-    if (byte == msg[count++]) {
+    if (msg[count] == 0xFF || byte == msg[count]) {
+      if (msg[count] = 0xFF) { state = byte; }
       count++;
       if (count == len) {
-        switchState(last);
+        switchState(state);
         count = 0;
         return true;
       }
     } else {
       count = 0;
     }
-    last = byte;
     return false;
   }
 };
