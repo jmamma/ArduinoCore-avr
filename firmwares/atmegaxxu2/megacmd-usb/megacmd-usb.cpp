@@ -34,8 +34,14 @@
 #include <util/delay.h>
 
 /** Dual use buffer for MIDI and SDCard **/
-uint8_t global_buffer[512];
 
+#define MEGACMD
+
+#ifdef MEGACMD
+uint8_t global_buffer[512];
+#else
+uint8_t global_buffer[sizeof(RingBuff_t) * 2];
+#endif
 /** Circular buffer to hold data from the host before it is sent to the device
  * via the serial port. */
 RingBuff_t *USBtoUSART_Buffer = (RingBuff_t *)global_buffer;
@@ -193,7 +199,9 @@ INIT:
         USB_Midi();
         break;
       case USB_STORAGE:
+        #ifdef MEGACMD
         MS_Device_USBTask(&Disk_MS_Interface);
+        #endif
         break;
       }
     }
