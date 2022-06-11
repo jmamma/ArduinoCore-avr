@@ -108,8 +108,10 @@ void SetupHardware(uint8_t state) {
     UCSR1B = ((1 << RXCIE1) | (1 << TXEN1) | (1 << RXEN1));
     break;
   case USB_STORAGE:
+    #ifdef MEGACMD
     while (!SDCardManager_Init(8))
       ;
+    #endif
     break;
   }
 
@@ -291,8 +293,7 @@ bool in_sysex = 0;
 bool special_case = false;
 MIDI_EventPacket_t SendMIDIEvent;
 
-
-uint8_t change_mode_msg[] = {0xF0, 0x7D, 0x4D, 0x43, 0x4C, 0x01, 0xFF, 0xF7};;
+const uint8_t change_mode_msg[] PROGMEM = {0xF0, 0x7D, 0x4D, 0x43, 0x4C, 0x01, 0xFF, 0xF7};;
 
 class MessageCheck {
 
@@ -307,8 +308,9 @@ public:
   uint8_t len;
 
   bool check(uint8_t byte) {
-    if (msg[count] == 0xFF || byte == msg[count]) {
-      if (msg[count] == 0xFF) { state = byte; }
+    uint8_t b = pgm_read_word_near(msg + count);
+    if (b == 0xFF || byte == b) {
+      if (b == 0xFF) { state = byte; }
       count++;
       if (count == len) {
         if (state <= 3) { switchState(state); }
@@ -544,7 +546,9 @@ void EVENT_USB_Device_ConfigurationChanged(void) {
     MIDI_Device_ConfigureEndpoints(&USB_MIDI_Interface);
     break;
   case USB_STORAGE:
+    #ifdef MEGACMD
     MS_Device_ConfigureEndpoints(&Disk_MS_Interface);
+    #endif
     break;
   }
 }
@@ -559,7 +563,9 @@ void EVENT_USB_Device_ControlRequest(void) {
     MIDI_Device_ProcessControlRequest(&USB_MIDI_Interface);
     break;
   case USB_STORAGE:
+    #ifdef MEGACMD
     MS_Device_ProcessControlRequest(&Disk_MS_Interface);
+    #endif
     break;
   }
 }
