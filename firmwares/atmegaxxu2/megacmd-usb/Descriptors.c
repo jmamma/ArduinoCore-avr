@@ -484,10 +484,12 @@ uint16_t CALLBACK_USB_GetDescriptor(const uint16_t wValue,
               Address = &USB_MIDI_ConfigurationDescriptor;
 			  Size    = sizeof(USB_MIDI_Descriptor_Configuration_t);
               break;
+#ifdef MEGACMD
               case USB_STORAGE:
               Address = &USB_Storage_ConfigurationDescriptor;
 			  Size    = sizeof(USB_Storage_Descriptor_Configuration_t);
               break;
+#endif
             }
             break;
 		case DTYPE_String:

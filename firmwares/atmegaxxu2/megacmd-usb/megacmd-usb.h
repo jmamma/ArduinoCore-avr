@@ -61,10 +61,21 @@ extern "C" {
 }
 
 #include <c_structs.h>
-extern uint8_t global_buffer[512];
+extern uint8_t global_buffer[];
 extern uint8_t usb_mode;
 
+/** Circular buffer to hold data from the host before it is sent to the device
+ * via the serial port. */
+extern RingBuff_t *USBtoUSART_Buffer;
+
+/** Circular buffer to hold data from the serial port before it is sent to the
+ * host. */
+extern RingBuff_t *USARTtoUSB_Buffer;
+
 /* Function Prototypes: */
+
+void turbo_set_speed(uint8_t speed);
+
 void SetupHardware(uint8_t state);
 void USB_Serial();
 void USB_Midi();
@@ -80,5 +91,6 @@ void EVENT_CDC_Device_ControLineStateChanged(
     USB_ClassInfo_CDC_Device_t *const CDCInterfaceInfo);
 
 bool CALLBACK_MS_Device_SCSICommandReceived(USB_ClassInfo_MS_Device_t* const MSInterfaceInfo);
+
 
 #endif /* _ARDUINO_USBSERIAL_H_ */
