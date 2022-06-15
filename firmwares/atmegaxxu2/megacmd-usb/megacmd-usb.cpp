@@ -33,7 +33,6 @@
 #include "megacmd-usb.h"
 #include <util/delay.h>
 #include "MidiUart.h"
-
 /** Dual use buffer for MIDI and SDCard **/
 
 #ifdef MEGACMD
@@ -91,9 +90,7 @@ void Jump_To_Bootloader(void) {
 }
 extern "C" void uart_tick();
 
-void uart_tick() {
-  uart.tickActiveSense();
-}
+void uart_tick() { uart.tickActiveSense(); }
 
 /** Configures the board hardware and chip peripherals for the demo's
  * functionality. */
@@ -112,10 +109,10 @@ void SetupHardware(uint8_t state) {
     uart.setSpeed(31250);
     break;
   case USB_STORAGE:
-    #ifdef MEGACMD
+#ifdef MEGACMD
     while (!SDCardManager_Init(8))
       ;
-    #endif
+#endif
     break;
   }
 
@@ -146,7 +143,9 @@ void initState(uint8_t state) {
 }
 
 void switchState(uint8_t state) {
-  if (state > 3) { return; }
+  if (state > 3) {
+    return;
+  }
 
   if (state == USB_DFU) {
     Jump_To_Bootloader();
@@ -156,7 +155,7 @@ void switchState(uint8_t state) {
   cli();
   USB_Disable();
   // Serial_Disable();
-  for (uint8_t i = 0; i < 128; i++)
+  for (uint8_t i = 0; i < 8; i++)
     _delay_ms(16);
   initState(state);
 }
@@ -192,14 +191,14 @@ INIT:
   initState(state);
 
   for (;;) {
-    #ifdef MEGACMD
+#ifdef MEGACMD
     bool a = PINC & (1 << PC5);
     bool b = PINC & (1 << PC4);
     state = (uint8_t)a * 2 + (uint8_t)b;
     if (state == USB_DFU) {
       switchState(state);
     }
-    #endif
+#endif
     if (USB_DeviceState == DEVICE_STATE_Configured) {
       switch (usb_mode) {
       case USB_SERIAL:
@@ -209,9 +208,9 @@ INIT:
         USB_Midi();
         break;
       case USB_STORAGE:
-        #ifdef MEGACMD
+#ifdef MEGACMD
         MS_Device_USBTask(&Disk_MS_Interface);
-        #endif
+#endif
         break;
       }
     }
@@ -261,10 +260,11 @@ bool in_sysex = 0;
 bool special_case = false;
 MIDI_EventPacket_t SendMIDIEvent;
 
+const uint8_t change_mode_msg[] PROGMEM = {0xF0, 0x7D, 0x4D, 0x43,
+                                           0x4C, 0x01, 0xFF, 0xF7};
 
-const uint8_t change_mode_msg[] PROGMEM = {0xF0, 0x7D, 0x4D, 0x43, 0x4C, 0x01, 0xFF, 0xF7};;
-
-const uint8_t turbo_setspeed_msg[] PROGMEM = {0xF0, 0x00, 0x20, 0x3c, 0x00, 0x00, 0x20, 0xFF, 0xF7};
+const uint8_t turbo_setspeed_msg[] PROGMEM = {0xF0, 0x00, 0x20, 0x3c, 0x00,
+                                              0x00, 0x20, 0xFF, 0xF7};
 
 class MessageCheck {
 
@@ -283,7 +283,9 @@ public:
   bool check(uint8_t byte) {
     uint8_t b = pgm_read_byte_near(msg + count);
     if (b == 0xFF || byte == b) {
-      if (b == 0xFF) { state = byte; }
+      if (b == 0xFF) {
+        state = byte;
+      }
       count++;
       if (count == len) {
         callback(state);
@@ -302,49 +304,49 @@ MessageCheck msg_uart(change_mode_msg, sizeof(change_mode_msg), &switchState);
 
 void turbo_set_speed(uint8_t speed) {
   const uint32_t tmSpeeds[] = {31250,  31250,  62500,  104062, 125000, 156250,
-                           208125, 250000, 312500, 415625, 500000, 625000};
+                               208125, 250000, 312500, 415625, 500000, 625000};
 
-  if (uart.speed == tmSpeeds[speed ]) { return; }
+  if (uart.speed == tmSpeeds[speed]) {
+    return;
+  }
   cli();
   for (uint8_t n = 0; n < 16; n++) {
     uart.m_putc_immediate(0x00);
   }
   uart.setSpeed(tmSpeeds[speed]);
-  //RingBuffer_InitBuffer(USARTtoUSB_Buffer);
-  //RingBuffer_InitBuffer(USBtoUSART_Buffer);
+  // RingBuffer_InitBuffer(USARTtoUSB_Buffer);
+  // RingBuffer_InitBuffer(USBtoUSART_Buffer);
   if (speed <= 1) {
     uart.activeSenseEnabled = false;
-  }
-  else {
+  } else {
     uart.setActiveSenseTimer(150);
   }
   sei();
-
 }
 
-MessageCheck msg_uart_turbo(turbo_setspeed_msg, sizeof(turbo_setspeed_msg), &turbo_set_speed);
+MessageCheck msg_uart_turbo(turbo_setspeed_msg, sizeof(turbo_setspeed_msg),
+                            &turbo_set_speed);
 
 void send_midi_event(MIDI_EventPacket_t *event) {
-   MIDI_Device_SendEventPacket(&USB_MIDI_Interface, event);
-   MIDI_Device_Flush(&USB_MIDI_Interface);
+  MIDI_Device_SendEventPacket(&USB_MIDI_Interface, event);
+  MIDI_Device_Flush(&USB_MIDI_Interface);
 }
 
 void USB_Midi() {
 
   if (uart.activeSenseEnabled && uart.recvActiveSenseTimer >= 300) {
-      turbo_set_speed(0);
+    turbo_set_speed(0);
   }
 
   MIDI_EventPacket_t ReceivedMIDIEvent;
-  uint8_t *ptr;
 
   while (
       MIDI_Device_ReceiveEventPacket(&USB_MIDI_Interface, &ReceivedMIDIEvent)) {
-    uint8_t *ptr = ((uint8_t *)&ReceivedMIDIEvent);
+    uint8_t *msg = ((uint8_t *)&ReceivedMIDIEvent);
 
-    uint8_t cin = (*ptr) & 0x0F;
+    uint8_t cin = (*msg) & 0x0F;
     uint8_t len = 0;
-    ptr++;
+    msg++;
     switch (cin) {
     default: {
       continue;
@@ -375,10 +377,8 @@ void USB_Midi() {
     }
 
     for (uint8_t n = 0; n < len; n++) {
-      if (msg_usb.check(ptr[n])) {
-        return;
-      }
-      RingBuffer_Insert(USBtoUSART_Buffer, ptr[n]);
+      msg_usb.check(msg[n]);
+      RingBuffer_Insert(USBtoUSART_Buffer, msg[n]);
     }
 
     if (len) {
@@ -390,7 +390,7 @@ void USB_Midi() {
   if ((TIFR0 & (1 << TOV0)) || (BufferCount > BUFFER_NEARLY_FULL)) {
     TIFR0 |= (1 << TOV0);
 
-    ptr = ((uint8_t *)&SendMIDIEvent);
+    uint8_t *ptr = ((uint8_t *)&SendMIDIEvent);
     while (BufferCount--) {
       uint8_t c = RingBuffer_Remove(USARTtoUSB_Buffer);
       bool send = false;
@@ -399,18 +399,18 @@ void USB_Midi() {
       if (MIDI_IS_REALTIME_STATUS_BYTE(c)) {
         uart.recvActiveSenseTimer = 0;
         switch (c) {
-          default:
-            MIDI_EventPacket_t SendMIDIEventTemp;
-            ptr = ((uint8_t *)&SendMIDIEventTemp);
-            ptr[0] = 0xF; // Single byte, Realtime
-            ptr[1] = c;
-            ptr[2] = 0;
-            ptr[3] = 0;
-            send_midi_event(&SendMIDIEventTemp);
-            continue;
-          case MIDI_ACTIVE_SENSE:
-            //Ignore active sense
-            continue;
+        default:
+          MIDI_EventPacket_t SendMIDIEventTemp;
+          ptr = ((uint8_t *)&SendMIDIEventTemp);
+          ptr[0] = 0xF; // Single byte, Realtime
+          ptr[1] = c;
+          ptr[2] = 0;
+          ptr[3] = 0;
+          send_midi_event(&SendMIDIEventTemp);
+          continue;
+        case MIDI_ACTIVE_SENSE:
+          // Ignore active sense
+          continue;
         }
       }
       // STATUS BYTES < 0xF0
@@ -420,22 +420,6 @@ void USB_Midi() {
         if (c < 0xF0) {
           in_sysex = 0;
           switch (c & 0xF0) {
-          case MIDI_MTC_QUARTER_FRAME:
-            ptr[0] = 0x2;
-            message_len = 1;
-            break;
-          case MIDI_SONG_POSITION_PTR:
-            ptr[0] = 0x3;
-            message_len = 2;
-            break;
-          case MIDI_SONG_SELECT:
-            ptr[0] = 0x2;
-            message_len = 1;
-            break;
-          case MIDI_TUNE_REQUEST:
-            ptr[0] = 0x5;
-            message_len = 0;
-            break;
           case MIDI_NOTE_OFF:
             ptr[0] = 0x8;
             message_len = 2;
@@ -466,14 +450,26 @@ void USB_Midi() {
             break;
           }
         } else {
-          //System common 0xF0 -> 0xF7
+          // System common 0xF0 -> 0xF7
           switch (c) {
           default:
-            ptr[0] = 0xF;
+            ptr[0] = 0x5;
             in_sysex = 0;
-            message_len = 0;
             special_case = false;
             data_cnt = 0;
+            message_len = 0;
+            break;
+          case MIDI_MTC_QUARTER_FRAME:
+            ptr[0] = 0x2;
+            message_len = 1;
+            break;
+          case MIDI_SONG_POSITION_PTR:
+            ptr[0] = 0x3;
+            message_len = 2;
+            break;
+          case MIDI_SONG_SELECT:
+            ptr[0] = 0x2;
+            message_len = 1;
             break;
           case MIDI_SYSEX_START:
             ptr[0] = 0x4;
@@ -559,7 +555,7 @@ void USB_Midi() {
       }
       if (send) {
         send_midi_event(&SendMIDIEvent);
-     }
+      }
     }
   }
   /* General management task for a given MIDI class interface, required for
@@ -580,9 +576,9 @@ void EVENT_USB_Device_ConfigurationChanged(void) {
     MIDI_Device_ConfigureEndpoints(&USB_MIDI_Interface);
     break;
   case USB_STORAGE:
-    #ifdef MEGACMD
+#ifdef MEGACMD
     MS_Device_ConfigureEndpoints(&Disk_MS_Interface);
-    #endif
+#endif
     break;
   }
 }
@@ -597,9 +593,9 @@ void EVENT_USB_Device_ControlRequest(void) {
     MIDI_Device_ProcessControlRequest(&USB_MIDI_Interface);
     break;
   case USB_STORAGE:
-    #ifdef MEGACMD
+#ifdef MEGACMD
     MS_Device_ProcessControlRequest(&Disk_MS_Interface);
-    #endif
+#endif
     break;
   }
 }
@@ -667,7 +663,7 @@ ISR(USART1_RX_vect, ISR_BLOCK) {
     RingBuffer_Insert(USARTtoUSB_Buffer, ReceivedByte);
 }
 
-ISR(USART1_UDRE_vect) {
+ISR(USART1_UDRE_vect, ISR_BLOCK) {
   if (!(RingBuffer_IsEmpty(USBtoUSART_Buffer))) {
     UDR1 = RingBuffer_Remove(USBtoUSART_Buffer);
   }
