@@ -177,15 +177,18 @@ int main(void) {
   TIMSK1 |= (1 << OCIE1A);
 
   /* Set PORTC input */
+
+  //PC2 -> PK0
+  //PC4 -> PK1
+  //PC5 -> PK2 
   DDRC = 0;
   PORTC = 0;
   // PC7 is output, used for SD Card select. Active HIGH
-  // PC2 is output, used for indicating official MegaCMD. active low
-  DDRC |= (1 << PC7) | (1 << PC2);
+  // PC5 is output, used for indicating official MegaCMD. active low
+  DDRC |= (1 << PC7) | (1 << PC5);
   PORTC |= (1 << PC7);
-
-  // PC4, PC5 are input and should be active high. Therefor enable pullup.
-  PORTC |= (1 << PC4) | (1 << PC5);
+  // PC4, PC2 are input. DFU mode is active low. Therefor enable pullup.
+  PORTC |= (1 << PC2) | (1 << PC4);
 
 INIT:
   initState(state);
@@ -194,6 +197,7 @@ INIT:
 #ifdef MEGACMD
     bool a = PINC & (1 << PC5);
     bool b = PINC & (1 << PC4);
+
     state = (uint8_t)a * 2 + (uint8_t)b;
     if (state == USB_DFU) {
       switchState(state);
@@ -213,8 +217,8 @@ INIT:
 #endif
         break;
       }
-    }
     USB_USBTask();
+    }
   }
 }
 
@@ -671,7 +675,9 @@ ISR(USART1_UDRE_vect, ISR_BLOCK) {
     UART_CLEAR_ISR_TX_BIT();
   }
 }
-
+void EVENT_USB_Device_Disconnect(void)
+{
+}
 /** Event handler for the CDC Class driver Host-to-Device Line Encoding
  * Changed event.
  *
