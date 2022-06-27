@@ -142,6 +142,11 @@ void initState(uint8_t state) {
     _delay_ms(16);
 }
 
+void send_midi_event(MIDI_EventPacket_t *event) {
+  MIDI_Device_SendEventPacket(&USB_MIDI_Interface, event);
+  MIDI_Device_Flush(&USB_MIDI_Interface);
+}
+
 void switchState(uint8_t state) {
   if (state > 3) {
     return;
@@ -178,9 +183,9 @@ int main(void) {
 
   /* Set PORTC input */
 
-  //PC2 -> PK0
-  //PC4 -> PK1
-  //PC5 -> PK2 
+  // PC2 -> PK0
+  // PC4 -> PK1
+  // PC5 -> PK2
   DDRC = 0;
   PORTC = 0;
   // PC7 is output, used for SD Card select. Active HIGH
@@ -217,7 +222,7 @@ INIT:
 #endif
         break;
       }
-    USB_USBTask();
+      USB_USBTask();
     }
   }
 }
@@ -230,27 +235,30 @@ void USB_Serial() {
   if (!(RingBuffer_IsFull(USBtoUSART_Buffer))) {
     int16_t ReceivedByte = CDC_Device_ReceiveByte(&VirtualSerial_CDC_Interface);
 
-    /* Read bytes from the USB OUT endpoint into the USART transmit buffer
-     */
-    if (!(ReceivedByte < 0))
+
+    if (!(ReceivedByte < 0)) {
       RingBuffer_Insert(USBtoUSART_Buffer, ReceivedByte);
-    UART_SET_ISR_TX_BIT();
+      UART_SET_ISR_TX_BIT();
+    }
   }
-  // if (USB_DeviceState == DEVICE_STATE_Configured) {
-  //   CDC_Device_SendByte(&VirtualSerial_CDC_Interface,state);
-  //}
-
-  /* Check if the UART receive buffer flush timer has expired or the buffer
-   * is nearly full */
-  // 40ms ??
   RingBuff_Count_t BufferCount = RingBuffer_GetCount(USARTtoUSB_Buffer);
-  if ((TIFR0 & (1 << TOV0)) || (BufferCount > BUFFER_NEARLY_FULL)) {
-    TIFR0 |= (1 << TOV0);
+  if (BufferCount) {
+    Endpoint_SelectEndpoint(
+        VirtualSerial_CDC_Interface.Config.DataINEndpoint.Address);
 
-    /* Read bytes from the USART receive buffer into the USB IN endpoint */
-    while (BufferCount--)
-      CDC_Device_SendByte(&VirtualSerial_CDC_Interface,
-                          RingBuffer_Remove(USARTtoUSB_Buffer));
+    if (Endpoint_IsINReady()) {
+      uint8_t BytesToSend = MIN(BufferCount, (CDC_TXRX_EPSIZE - 1));
+
+      while (BytesToSend--) {
+        if (CDC_Device_SendByte(&VirtualSerial_CDC_Interface,
+                                RingBuffer_Peek(USARTtoUSB_Buffer)) !=
+            ENDPOINT_READYWAIT_NoError) {
+          break;
+        }
+
+        RingBuffer_Remove(USARTtoUSB_Buffer);
+      }
+    }
   }
 
   /* Load the next byte from the USART transmit buffer into the USART */
@@ -331,16 +339,11 @@ void turbo_set_speed(uint8_t speed) {
 MessageCheck msg_uart_turbo(turbo_setspeed_msg, sizeof(turbo_setspeed_msg),
                             &turbo_set_speed);
 
-void send_midi_event(MIDI_EventPacket_t *event) {
-  MIDI_Device_SendEventPacket(&USB_MIDI_Interface, event);
-  MIDI_Device_Flush(&USB_MIDI_Interface);
-}
-
 void USB_Midi() {
 
-  if (uart.activeSenseEnabled && uart.recvActiveSenseTimer >= 300) {
+  /*if (uart.activeSenseEnabled && uart.recvActiveSenseTimer >= 300) {
     turbo_set_speed(0);
-  }
+  }*/
 
   MIDI_EventPacket_t ReceivedMIDIEvent;
 
@@ -384,18 +387,18 @@ void USB_Midi() {
       msg_usb.check(msg[n]);
       RingBuffer_Insert(USBtoUSART_Buffer, msg[n]);
     }
-
     if (len) {
       UART_SET_ISR_TX_BIT();
     }
   }
+  uint16_t BufferCount = RingBuffer_GetCount(USARTtoUSB_Buffer);
+  Endpoint_SelectEndpoint(USB_MIDI_Interface.Config.DataINEndpoint.Address);
 
-  RingBuff_Count_t BufferCount = RingBuffer_GetCount(USARTtoUSB_Buffer);
-  if ((TIFR0 & (1 << TOV0)) || (BufferCount > BUFFER_NEARLY_FULL)) {
-    TIFR0 |= (1 << TOV0);
-
+  if (BufferCount && Endpoint_IsINReady()) {
+    uint8_t count = MIN(BufferCount, (CDC_TXRX_EPSIZE - 4));
     uint8_t *ptr = ((uint8_t *)&SendMIDIEvent);
-    while (BufferCount--) {
+
+    while (count--) {
       uint8_t c = RingBuffer_Remove(USARTtoUSB_Buffer);
       bool send = false;
 
@@ -663,8 +666,9 @@ void EVENT_CDC_Device_LineEncodingChanged(
  */
 ISR(USART1_RX_vect, ISR_BLOCK) {
   uint8_t ReceivedByte = UDR1;
-  if (USB_DeviceState == DEVICE_STATE_Configured)
+  if (USB_DeviceState == DEVICE_STATE_Configured && !(RingBuffer_IsFull(USARTtoUSB_Buffer))) {
     RingBuffer_Insert(USARTtoUSB_Buffer, ReceivedByte);
+  }
 }
 
 ISR(USART1_UDRE_vect, ISR_BLOCK) {
@@ -675,9 +679,7 @@ ISR(USART1_UDRE_vect, ISR_BLOCK) {
     UART_CLEAR_ISR_TX_BIT();
   }
 }
-void EVENT_USB_Device_Disconnect(void)
-{
-}
+void EVENT_USB_Device_Disconnect(void) {}
 /** Event handler for the CDC Class driver Host-to-Device Line Encoding
  * Changed event.
  *

@@ -39,8 +39,8 @@
 /* Includes: */
 #include <util/atomic.h>
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 /* Defines: */
 /** Size of each ring buffer, in data elements - must be between 1 and 255. */
@@ -153,12 +153,13 @@ static inline bool RingBuffer_IsEmpty(RingBuff_t *const Buffer) {
  */
 static inline void RingBuffer_Insert(RingBuff_t *const Buffer,
                                      const RingBuff_Data_t Data) {
+  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
   *Buffer->In = Data;
 
   if (++Buffer->In == &Buffer->Buffer[BUFFER_SIZE])
     Buffer->In = Buffer->Buffer;
 
-  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { Buffer->Count++; }
+   Buffer->Count++; }
 }
 
 /** Removes an element from the ring buffer.
@@ -172,14 +173,27 @@ static inline void RingBuffer_Insert(RingBuff_t *const Buffer,
  *  \return Next data element stored in the buffer
  */
 static inline RingBuff_Data_t RingBuffer_Remove(RingBuff_t *const Buffer) {
-  RingBuff_Data_t Data = *Buffer->Out;
+   RingBuff_Data_t Data;
+   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+   Data = *Buffer->Out;
 
   if (++Buffer->Out == &Buffer->Buffer[BUFFER_SIZE])
     Buffer->Out = Buffer->Buffer;
 
-  ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { Buffer->Count--; }
+   Buffer->Count--; }
+
 
   return Data;
+}
+
+/** Returns the next element stored in the ring buffer, without removing it.
+ *
+ *  \param[in,out] Buffer  Pointer to a ring buffer structure to retrieve from.
+ *
+ *  \return Next data element stored in the buffer.
+ */
+static inline RingBuff_Data_t RingBuffer_Peek(RingBuff_t *const Buffer) {
+  return *Buffer->Out;
 }
 
 #endif
