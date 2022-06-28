@@ -68,6 +68,7 @@
 		/** Value for the DeviceType entry in the SCSI_Inquiry_Response_t enum, indicating a CD-ROM device. */
 		#define DEVICE_TYPE_CDROM   0x05
 
+        extern bool end_storage;
 	/* Function Prototypes: */
 		bool SCSI_DecodeSCSICommand(USB_ClassInfo_MS_Device_t* const MSInterfaceInfo);
 

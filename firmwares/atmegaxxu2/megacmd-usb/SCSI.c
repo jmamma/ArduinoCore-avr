@@ -88,6 +88,8 @@ static SCSI_Request_Sense_Response_t SenseData =
  *
  *  \return Boolean \c true if the command completed successfully, \c false otherwise
  */
+bool end_storage = false;
+
 bool SCSI_DecodeSCSICommand(USB_ClassInfo_MS_Device_t* const MSInterfaceInfo)
 {
 	bool CommandSuccess = false;
@@ -117,7 +119,11 @@ bool SCSI_DecodeSCSICommand(USB_ClassInfo_MS_Device_t* const MSInterfaceInfo)
 			CommandSuccess = SCSI_Command_ModeSense_6(MSInterfaceInfo);
 			break;
 		case SCSI_CMD_START_STOP_UNIT:
-		case SCSI_CMD_TEST_UNIT_READY:
+            end_storage = true;
+            CommandSuccess = true;
+            MSInterfaceInfo->State.CommandBlock.DataTransferLength = 0;
+            break;
+        case SCSI_CMD_TEST_UNIT_READY:
 		case SCSI_CMD_PREVENT_ALLOW_MEDIUM_REMOVAL:
 		case SCSI_CMD_VERIFY_10:
 			/* These commands should just succeed, no handling required */

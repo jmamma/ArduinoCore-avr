@@ -63,7 +63,6 @@ extern "C" {
 #include <c_structs.h>
 extern uint8_t global_buffer[];
 extern uint8_t usb_mode;
-
 /** Circular buffer to hold data from the host before it is sent to the device
  * via the serial port. */
 extern RingBuff_t *USBtoUSART_Buffer;

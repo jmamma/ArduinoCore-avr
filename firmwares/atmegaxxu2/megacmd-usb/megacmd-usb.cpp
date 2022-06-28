@@ -61,14 +61,23 @@ uint32_t Boot_Key ATTR_NO_INIT;
 #define UART_SET_ISR_TX_BIT() SET_BIT(UCSR1B, UDRIE1);
 #define UART_CLEAR_ISR_TX_BIT() CLEAR_BIT(UCSR1B, UDRIE1);
 
+uint16_t clock_diff(uint16_t old_clock, uint16_t new_clock) {
+  if (new_clock >= old_clock)
+    return new_clock - old_clock;
+  else
+    return new_clock + (65536 - old_clock);
+}
+
 void Bootloader_Jump_Check(void) ATTR_INIT_SECTION(3);
 void Bootloader_Jump_Check(void) {
   // If the reset source was the bootloader and the key is correct, clear it and
   // jump to the bootloader
-  if ((MCUSR & (1 << WDRF)) && (Boot_Key == MAGIC_BOOT_KEY)) {
+  if ((MCUSR & (1 << WDRF))) {
+    if (Boot_Key == MAGIC_BOOT_KEY) {
     Boot_Key = 0;
     ((void (*)(void))BOOTLOADER_START_ADDRESS)();
-  }
+    }
+ }
 }
 
 void Jump_To_Bootloader(void) {
@@ -137,9 +146,9 @@ void initState(uint8_t state) {
   RingBuffer_InitBuffer(USBtoUSART_Buffer);
   RingBuffer_InitBuffer(USARTtoUSB_Buffer);
   sei();
+  //for (uint8_t i = 0; i < 8; i++)
+  //  _delay_ms(16);
   // wait for MegaCMD to boot
-  for (uint8_t i = 0; i < 128; i++)
-    _delay_ms(16);
 }
 
 void send_midi_event(MIDI_EventPacket_t *event) {
@@ -155,9 +164,9 @@ void switchState(uint8_t state) {
   if (state == USB_DFU) {
     Jump_To_Bootloader();
   }
+  cli();
   Serial_Disable();
   USB_Detach();
-  cli();
   USB_Disable();
   // Serial_Disable();
   for (uint8_t i = 0; i < 8; i++)
@@ -195,17 +204,32 @@ int main(void) {
   // PC4, PC2 are input. DFU mode is active low. Therefor enable pullup.
   PORTC |= (1 << PC2) | (1 << PC4);
 
+  bool check_state = false;
+
 INIT:
   initState(state);
 
   for (;;) {
 #ifdef MEGACMD
-    bool a = PINC & (1 << PC5);
-    bool b = PINC & (1 << PC4);
+    if (end_storage) {
+      // If USB is used, detach from the bus and reset it
+      USB_Disable();
+      // Disable all interrupts
+      cli();
+      for (;;);
+    }
+    if (check_state) {
+      bool a = PINC & (1 << PC5);
+      bool b = PINC & (1 << PC4);
 
-    state = (uint8_t)a * 2 + (uint8_t)b;
-    if (state == USB_DFU) {
-      switchState(state);
+      state = (uint8_t)a * 2 + (uint8_t)b;
+      if (state == USB_DFU) {
+        switchState(state);
+      }
+    }
+    else {
+       //Wait 1 second for MCL to boot.
+       if (millis() > 1000) { check_state = true; }
     }
 #endif
     if (USB_DeviceState == DEVICE_STATE_Configured) {
@@ -679,7 +703,7 @@ ISR(USART1_UDRE_vect, ISR_BLOCK) {
     UART_CLEAR_ISR_TX_BIT();
   }
 }
-void EVENT_USB_Device_Disconnect(void) {}
+
 /** Event handler for the CDC Class driver Host-to-Device Line Encoding
  * Changed event.
  *

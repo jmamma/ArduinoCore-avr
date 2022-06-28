@@ -24,6 +24,9 @@ bool SDCardManager_Init(uint8_t chipSelectPin)
   return (s_cached_total_blocks > 0);
 }
 
+void SDCardManager_End() {
+}
+
 uint32_t SDCardManager_NumBlocks(void)
 {
   return s_cached_total_blocks;

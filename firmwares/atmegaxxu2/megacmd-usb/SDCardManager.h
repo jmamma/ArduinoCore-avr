@@ -55,7 +55,7 @@ extern "C" {
 #define LUN_MEDIA_BLOCKS            (SDCardManager_NumBlocks() / TOTAL_LUNS)    
 
 bool SDCardManager_Init(uint8_t chipSelectPin);
-
+void SDCardManager_End();
 uint32_t SDCardManager_NumBlocks(void);
 
 bool SDCardManager_CheckDataflashOperation();
