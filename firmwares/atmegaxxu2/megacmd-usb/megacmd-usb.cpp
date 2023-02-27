@@ -36,9 +36,9 @@
 /** Dual use buffer for MIDI and SDCard **/
 
 #ifdef MEGACMD
-uint8_t global_buffer[512];
+volatile uint8_t global_buffer[512];
 #else
-uint8_t global_buffer[sizeof(RingBuff_t) * 2];
+volatile uint8_t global_buffer[sizeof(RingBuff_t) * 2];
 #endif
 /** Circular buffer to hold data from the host before it is sent to the device
  * via the serial port. */
@@ -324,6 +324,7 @@ public:
       }
       count++;
       if (count == len) {
+        _delay_ms(100);
         callback(state);
         count = 0;
         return true;
@@ -417,7 +418,6 @@ void USB_Midi() {
   }
   uint16_t BufferCount = RingBuffer_GetCount(USARTtoUSB_Buffer);
   Endpoint_SelectEndpoint(USB_MIDI_Interface.Config.DataINEndpoint.Address);
-
   if (BufferCount && Endpoint_IsINReady()) {
     uint8_t count = MIN(BufferCount, (CDC_TXRX_EPSIZE - 4));
     uint8_t *ptr = ((uint8_t *)&SendMIDIEvent);
@@ -425,7 +425,7 @@ void USB_Midi() {
     while (count--) {
       uint8_t c = RingBuffer_Remove(USARTtoUSB_Buffer);
       bool send = false;
-
+      uint8_t sysex_end = false;
       // REALTIME, >= 0xF8
       if (MIDI_IS_REALTIME_STATUS_BYTE(c)) {
         uart.recvActiveSenseTimer = 0;
@@ -512,12 +512,9 @@ void USB_Midi() {
             uart.recvActiveSenseTimer = 0;
             if (!in_sysex)
               break; // error
-            if (msg_uart.check(c)) {
-              return;
-            }
-            msg_uart_turbo.check(c);
             in_sysex = 0;
             send = true;
+            sysex_end = true;
             if (special_case) {
               if (data_cnt == 1) {
                 ptr[0] = 0x6;
@@ -585,7 +582,11 @@ void USB_Midi() {
         }
       }
       if (send) {
-        send_midi_event(&SendMIDIEvent);
+         send_midi_event(&SendMIDIEvent);
+         if (sysex_end) {
+            msg_uart.check(c);
+            msg_uart_turbo.check(c);
+         }
       }
     }
   }
